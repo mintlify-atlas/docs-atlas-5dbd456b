@@ -1,97 +1,132 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: Euclides Rich Editor
+description: A powerful ProseMirror-based rich text editor for Angular applications
+mode: custom
 ---
 
-## Setting up
+<div className="bg-gradient-to-br from-[#121217] via-[#1a1d27] to-[#121217] dark:bg-gradient-to-br dark:from-[#121217] dark:via-[#1a1d27] dark:to-[#121217] bg-white py-20">
+  <div className="max-w-6xl mx-auto px-6">
+    <div className="text-center">
+      <h1 className="text-5xl md:text-6xl font-bold text-gray-900 dark:text-white mb-6">
+        Build rich text experiences with <span className="text-[#22f48d]">Euclides</span>
+      </h1>
+      <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto mb-8">
+        A ProseMirror-based rich text editor component library for Angular applications. Powerful, extensible, and easy to integrate.
+      </p>
+      <div className="flex flex-wrap gap-4 justify-center">
+        <a 
+          href="/quickstart" 
+          className="px-6 py-3 bg-[#22f48d] text-gray-900 font-semibold rounded-lg hover:bg-[#55fb8b] transition-colors no-underline"
+        >
+          Get Started
+        </a>
+        <a 
+          href="/api/euclides-rich-editor-component" 
+          className="px-6 py-3 bg-white/10 dark:bg-white/10 text-gray-900 dark:text-white font-semibold rounded-lg border border-gray-200 dark:border-white/30 hover:bg-white/20 dark:hover:bg-white/20 transition-colors no-underline"
+        >
+          Explore API
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
 
-Get your documentation site up and running in minutes.
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-3xl font-semibold text-gray-900 dark:text-white mb-4">Quick Start</h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">Get up and running in minutes</p>
+  
+  <Steps>
+    <Step title="Install the package">
+      Add Euclides Rich Editor to your Angular project using npm.
+      
+      ```bash
+      npm install euclides-rich-editor
+      ```
+    </Step>
+    
+    <Step title="Import the component">
+      Import the standalone component in your Angular component or module.
+      
+      ```typescript
+      import { EuclidesRichEditorComponent } from 'euclides-rich-editor';
+      
+      @Component({
+        selector: 'app-example',
+        standalone: true,
+        imports: [EuclidesRichEditorComponent],
+        template: '<euclides-rich-editor />'
+      })
+      export class ExampleComponent {}
+      ```
+    </Step>
+    
+    <Step title="Start editing">
+      The editor is ready to use with built-in support for text formatting, lists, links, and more.
+      
+      <Info>
+        Check out the [quickstart guide](/quickstart) for a complete walkthrough with all available features.
+      </Info>
+    </Step>
+  </Steps>
+</div>
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-3xl font-semibold text-gray-900 dark:text-white mb-4">Explore features</h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">Discover what you can build with Euclides</p>
+  
+  <CardGroup cols={2}>
+    <Card title="Text formatting" icon="bold" href="/guides/text-formatting">
+      Apply bold, italic, strikethrough, and code formatting to your content
+    </Card>
+    <Card title="Text alignment" icon="align-left" href="/guides/text-alignment">
+      Align paragraphs left, center, or right with custom schema attributes
+    </Card>
+    <Card title="Lists" icon="list" href="/guides/lists">
+      Create ordered and unordered lists with full keyboard support
+    </Card>
+    <Card title="Links" icon="link" href="/guides/links">
+      Add and manage hyperlinks with a built-in popover interface
+    </Card>
+    <Card title="Custom schema" icon="code" href="/guides/custom-schema">
+      Extend the editor with custom nodes and marks for your use case
+    </Card>
+    <Card title="Code blocks" icon="code-branch" href="/guides/text-formatting">
+      Insert code blocks with syntax highlighting support
+    </Card>
+  </CardGroup>
+</div>
 
-## Make it yours
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-3xl font-semibold text-gray-900 dark:text-white mb-4">Core concepts</h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">Understand the architecture behind Euclides</p>
+  
+  <CardGroup cols={2}>
+    <Card title="Architecture" icon="sitemap" href="/concepts/architecture">
+      Learn how ProseMirror powers the editor with EditorState, EditorView, and Schema
+    </Card>
+    <Card title="Schema" icon="book" href="/concepts/schema">
+      Understand how the schema defines the document structure and rules
+    </Card>
+    <Card title="Nodes vs marks" icon="diagram-project" href="/concepts/nodes-vs-marks">
+      Discover the difference between block-level nodes and inline marks
+    </Card>
+    <Card title="Editor state" icon="database" href="/concepts/editor-state">
+      Manage document state, selections, and transactions
+    </Card>
+  </CardGroup>
+</div>
 
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
-  </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
-  </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
-  </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
-
-## Create beautiful pages
-
-Everything you need to create world-class documentation.
-
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
-
-## Need inspiration?
-
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="bg-gray-50 dark:bg-[#1a1d27] border border-gray-200 dark:border-[#27272a] rounded-2xl p-8 text-center">
+    <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-4">Ready to build?</h2>
+    <p className="text-base text-gray-600 dark:text-gray-400 mb-6 max-w-xl mx-auto">
+      Start building rich text experiences for your Angular applications with Euclides Rich Editor.
+    </p>
+    <a 
+      href="/installation" 
+      className="inline-block px-6 py-3 bg-[#22f48d] text-gray-900 font-semibold rounded-lg hover:bg-[#55fb8b] transition-colors no-underline"
+    >
+      Install now
+    </a>
+  </div>
+</div>

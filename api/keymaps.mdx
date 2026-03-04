@@ -1,0 +1,163 @@
+---
+title: Keymaps
+description: Keyboard shortcuts and key bindings for the Euclides Rich Editor
+---
+
+## Overview
+
+Keymaps define keyboard shortcuts that trigger commands in the Euclides Rich Editor. The editor uses a layered keymap system where custom shortcuts take precedence over base shortcuts.
+
+## buildEuclidesKeymap()
+
+Creates the custom keymap plugin for Euclides Editor.
+
+### Signature
+
+```typescript
+export function buildEuclidesKeymap(schema: Schema): Plugin
+```
+
+### Parameters
+
+- `schema` (Schema): The editor schema used to access node and mark types
+
+### Returns
+
+- `Plugin`: A ProseMirror keymap plugin
+
+## Keyboard Shortcuts
+
+### Implementation
+
+```typescript
+export function buildEuclidesKeymap(schema: Schema): Plugin {
+  return keymap({
+    "Mod-b": toggleMark(schema.marks["strong"]),
+    "Mod-i": toggleMark(schema.marks["em"]),
+    "Mod-z": undo,
+    "Mod-y": redo,
+    "Shift-Mod-z": redo, // Mac usa este comando
+    "Shift-Enter": cmd,
+    "Enter": splitListItem(schema.nodes["list_item"]),
+    "Shift-Ctrl-c": setBlockType(schema.nodes['code_block'])
+  });
+}
+```
+
+### Available Key Bindings
+
+| Shortcut | Command | Description |
+|----------|---------|-------------|
+| `Mod-b` | `toggleMark(strong)` | Toggle bold formatting |
+| `Mod-i` | `toggleMark(em)` | Toggle italic formatting |
+| `Mod-z` | `undo` | Undo last change |
+| `Mod-y` | `redo` | Redo last undone change |
+| `Shift-Mod-z` | `redo` | Redo (Mac-style shortcut) |
+| `Shift-Enter` | `cmd` (hard break) | Insert line break |
+| `Enter` | `splitListItem` | Create new list item |
+| `Shift-Ctrl-c` | `setBlockType(code_block)` | Convert to code block |
+
+### Modifier Key: "Mod"
+
+The `"Mod"` prefix is a cross-platform modifier:
+- **Windows/Linux**: `Ctrl`
+- **Mac**: `Cmd`
+
+This ensures shortcuts work correctly across different operating systems.
+
+## Command Details
+
+### Text Formatting
+
+**Bold (`Mod-b`)**
+```typescript
+toggleMark(schema.marks["strong"])
+```
+Toggles the `strong` mark on the current selection.
+
+**Italic (`Mod-i`)**
+```typescript
+toggleMark(schema.marks["em"])
+```
+Toggles the `em` mark on the current selection.
+
+### History Commands
+
+**Undo (`Mod-z`)**
+```typescript
+undo
+```
+Reverts the last change from the history plugin.
+
+**Redo (`Mod-y` or `Shift-Mod-z`)**
+```typescript
+redo
+```
+Reapplies the last undone change. Two shortcuts are provided:
+- `Mod-y`: Windows/Linux style
+- `Shift-Mod-z`: Mac style
+
+### Line Breaks
+
+**Hard Break (`Shift-Enter`)**
+```typescript
+const cmd = (state: EditorState, dispatch?: (tr: Transaction) => void) => {
+  const brType = state.schema.nodes["hard_break"];
+  if (!brType) return false;
+  if (dispatch) {
+    dispatch(state.tr.replaceSelectionWith(brType.create()).scrollIntoView());
+  }
+  return true;
+};
+```
+
+Inserts a hard line break (`<br>`) within a paragraph, useful for creating line breaks inside list items without starting a new list item.
+
+### List Operations
+
+**Split List Item (`Enter`)**
+```typescript
+splitListItem(schema.nodes["list_item"])
+```
+
+When pressed inside a list item:
+- Creates a new list item
+- Moves cursor to the new item
+- Preserves list structure
+
+### Block Type Conversion
+
+**Code Block (`Shift-Ctrl-c`)**
+```typescript
+setBlockType(schema.nodes['code_block'])
+```
+
+Converts the current block (e.g., paragraph) into a code block.
+
+## Keymap Configuration
+
+The keymap system works in layers:
+
+1. **Euclides Keymap** (highest priority)
+2. **Base Keymap** (fallback)
+
+When a key is pressed:
+1. The editor checks Euclides keymap first
+2. If no match, it falls back to base keymap
+3. If still no match, default browser behavior occurs
+
+This is why `buildEuclidesKeymap()` is registered before `keymap(baseKeymap)` in the plugin list:
+
+```typescript
+export function buildPlugins(stateService: EditorStateService) {
+  return [
+    buildEuclidesKeymap(EuclidesEditorSchema), // 👈 PRIMERO
+    keymap(baseKeymap),                        // 👈 DESPUÉS
+    // ...
+  ];
+}
+```
+
+## Source Reference
+
+Location: `~/workspace/source/projects/euclides-rich-editor/src/lib/engine/keymaps/euclides-keymaps.ts`

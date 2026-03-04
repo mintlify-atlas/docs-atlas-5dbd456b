@@ -1,0 +1,255 @@
+---
+title: 'EuclidesRichEditorComponent'
+description: 'Main component for the Euclides Rich Editor providing a ProseMirror-based rich text editing interface'
+---
+
+## Overview
+
+The `EuclidesRichEditorComponent` is the core component of the Euclides Rich Editor. It provides a rich text editing interface built on ProseMirror, with methods for text formatting, link management, and editor state control.
+
+## Selector
+
+```html
+<euclides-rich-editor></euclides-rich-editor>
+```
+
+## Imports
+
+```typescript
+import { EuclidesRichEditorComponent } from '@euclides/rich-editor';
+```
+
+## Properties
+
+<ParamField path="view" type="EditorView">
+  ProseMirror EditorView instance that manages the editor state and rendering
+</ParamField>
+
+<ParamField path="editorRef" type="ElementRef<HTMLDivElement>">
+  ViewChild reference to the editor container DOM element
+</ParamField>
+
+<ParamField path="showLinkPopover" type="boolean" default="false">
+  Controls the visibility of the link popover dialog
+</ParamField>
+
+<ParamField path="currentLink" type="string" default="''">
+  Stores the URL of the current link being edited
+</ParamField>
+
+<ParamField path="editorCommandsService" type="EditorCommandsService">
+  Injected service for executing editor commands (bold, italic, lists, etc.)
+</ParamField>
+
+<ParamField path="editorStateService" type="EditorStateService">
+  Injected service for managing editor state
+</ParamField>
+
+## Lifecycle Hooks
+
+### ngAfterViewInit()
+
+```typescript
+ngAfterViewInit(): void
+```
+
+Initializes the ProseMirror editor view after Angular has rendered the component. This ensures the `editorRef` is available before creating the editor instance.
+
+**When called**: After Angular has fully rendered the component view and its children.
+
+**Behavior**: Creates the EditorView using `EditorEngine.create()` with the native element and editor state service.
+
+### ngOnDestroy()
+
+```typescript
+ngOnDestroy(): void
+```
+
+Cleans up the editor view when the component is destroyed.
+
+**Behavior**: Calls `this.view.destroy()` to properly dispose of ProseMirror resources.
+
+## Text Formatting Methods
+
+### toggleBold()
+
+```typescript
+toggleBold(): void
+```
+
+Toggles bold formatting on the current selection or at the cursor position.
+
+**Behavior**: 
+- Applies or removes bold mark using `EditorCommandsService`
+- Refocuses the editor after the command executes
+
+### toggleItalic()
+
+```typescript
+toggleItalic(): void
+```
+
+Toggles italic formatting on the current selection or at the cursor position.
+
+**Behavior**: 
+- Applies or removes italic mark using `EditorCommandsService`
+- Refocuses the editor after the command executes
+
+### toggleStrike()
+
+```typescript
+toggleStrike(): void
+```
+
+Toggles strikethrough formatting on the current selection or at the cursor position.
+
+**Behavior**: 
+- Applies or removes strike mark using `EditorCommandsService`
+- Refocuses the editor after the command executes
+
+## Alignment Methods
+
+### toggleAlign()
+
+```typescript
+toggleAlign(align: string): void
+```
+
+Sets text alignment for the current selection or block.
+
+<ParamField path="align" type="string" required>
+  Alignment value (e.g., 'left', 'center', 'right', 'justify')
+</ParamField>
+
+**Behavior**: 
+- Applies text alignment using `EditorCommandsService.setTextAlign()`
+- Refocuses the editor after the command executes
+
+## Block Methods
+
+### toggleCodeBlock()
+
+```typescript
+toggleCodeBlock(): void
+```
+
+Toggles code block formatting for the current selection or block.
+
+**Behavior**: 
+- Converts the current block to/from a code block
+- Refocuses the editor after the command executes
+
+### toggleList()
+
+```typescript
+toggleList(type: list): void
+```
+
+Toggles list formatting (ordered or unordered) for the current selection or block.
+
+<ParamField path="type" type="list" required>
+  List type to toggle ('bullet_list' or 'ordered_list')
+</ParamField>
+
+**Behavior**: 
+- Converts the current block to/from the specified list type
+- Refocuses the editor after the command executes
+
+## History Methods
+
+### undo()
+
+```typescript
+undo(): void
+```
+
+Undoes the last edit operation.
+
+**Behavior**: 
+- Uses ProseMirror's `undo()` function from `prosemirror-history`
+- Refocuses the editor after the operation
+- Does nothing if there are no operations to undo
+
+### redo()
+
+```typescript
+redo(): void
+```
+
+Redoes the last undone operation.
+
+**Behavior**: 
+- Uses ProseMirror's `redo()` function from `prosemirror-history`
+- Refocuses the editor after the operation
+- Does nothing if there are no operations to redo
+
+## Link Management Methods
+
+### openLinkPopover()
+
+```typescript
+openLinkPopover(): void
+```
+
+Opens the link popover dialog for creating or editing links.
+
+**Behavior**: 
+- Uses `getLinkRange()` to detect if cursor is on an existing link
+- Sets `currentLink` to the existing link URL if found
+- Sets `showLinkPopover` to `true` to display the popover
+
+### applyLink()
+
+```typescript
+applyLink(url: string): void
+```
+
+Applies a link to the current selection or updates an existing link.
+
+<ParamField path="url" type="string" required>
+  The URL to apply. If it doesn't start with 'http', 'https://' is automatically prepended
+</ParamField>
+
+**Behavior**: 
+- Automatically prepends 'https://' if URL doesn't start with 'http'
+- Updates existing link if cursor is on a link
+- Creates new link with the URL as both href and display text if no selection
+- Closes the popover and refocuses the editor
+
+### removeLink()
+
+```typescript
+removeLink(): void
+```
+
+Removes the link mark from the current cursor position.
+
+**Behavior**: 
+- Uses `getLinkRange()` to find the link range at cursor
+- Removes the link mark while preserving the text
+- Closes the popover
+- Does nothing if cursor is not on a link
+
+## Dependencies
+
+The component relies on the following injected services:
+
+- **EditorCommandsService**: Provides methods for text formatting, alignment, and block manipulation
+- **EditorStateService**: Manages the editor state for undo/redo functionality
+
+## Usage Example
+
+```typescript
+import { Component } from '@angular/core';
+import { EuclidesRichEditorComponent } from '@euclides/rich-editor';
+
+@Component({
+  selector: 'app-document-editor',
+  standalone: true,
+  imports: [EuclidesRichEditorComponent],
+  template: `
+    <euclides-rich-editor></euclides-rich-editor>
+  `
+})
+export class DocumentEditorComponent {}
+```

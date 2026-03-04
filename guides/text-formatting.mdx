@@ -1,0 +1,195 @@
+---
+title: Text Formatting
+description: Apply bold, italic, strikethrough, and code formatting to text in Euclides Rich Editor
+---
+
+## Overview
+
+Euclides Rich Editor provides several text formatting options through the `EditorCommandsService`. These formatting options are implemented as **marks** in ProseMirror, which means they apply styles to text within a block without changing the document structure.
+
+## Available Formatting Methods
+
+### Bold Text
+
+Toggle bold formatting using the `toggleBold` method:
+
+```typescript
+toggleBold(view: EditorView): boolean {
+    const command: Command = toggleMark(EuclidesEditorSchema.marks['strong'])
+    return command(view.state, view.dispatch)
+}
+```
+
+**Usage in your component:**
+
+```typescript
+import { EditorCommandsService } from 'euclides-rich-editor';
+
+toggleBold() {
+  if (this.editorCommandsService.toggleBold(this.view)) {
+    this.view.focus();
+  }
+}
+```
+
+<Note>
+The `toggleBold` method uses ProseMirror's `toggleMark` command with the `strong` mark from the schema. It returns `true` if the command was successfully executed.
+</Note>
+
+### Italic Text
+
+Toggle italic formatting using the `toggleItailc` method:
+
+```typescript
+toggleItailc(view: EditorView): boolean {
+    const command: Command = toggleMark(EuclidesEditorSchema.marks['em'])
+    return command(view.state, view.dispatch)
+}
+```
+
+**Usage in your component:**
+
+```typescript
+toggleItalic() {
+  if (this.editorCommandsService.toggleItailc(this.view)) {
+    this.view.focus();
+  }
+}
+```
+
+### Strikethrough Text
+
+Toggle strikethrough formatting using the `toggleStrike` method:
+
+```typescript
+toggleStrike(view: EditorView): boolean {
+    const command: Command = toggleMark(EuclidesEditorSchema.marks['strike'])
+    return command(view.state, view.dispatch)   
+}
+```
+
+**Usage in your component:**
+
+```typescript
+toggleStrike() {
+  if (this.editorCommandsService.toggleStrike(this.view)) {
+    this.view.focus();
+  }
+}
+```
+
+<Tip>
+Strikethrough is a custom mark added to the schema. See the [Custom Schema](/guides/custom-schema) guide to learn how to add your own marks.
+</Tip>
+
+### Code Blocks
+
+Convert a block to a code block using the `toggleCodeBlock` method:
+
+```typescript
+toggleCodeBlock(view: EditorView): boolean {
+    return CommandsMethods.turnIntoCodeBlock(EuclidesEditorSchema)(view.state, view.dispatch);
+}
+```
+
+**Usage in your component:**
+
+```typescript
+toggleCodeBlock() {
+  if (this.editorCommandsService.toggleCodeBlock(this.view)) {
+    this.view.focus();
+  }
+}
+```
+
+The `turnIntoCodeBlock` method has special handling for lists. When converting a list to a code block, it extracts the text from all list items and creates a single code block:
+
+```typescript
+// Extract text from all list items
+let text = "";
+node.forEach((listItem: any) => {
+    const para = listItem.firstChild;
+    if (para) {
+        text += para.textContent + "\n";
+    }
+});
+```
+
+## How Marks Work
+
+Text formatting in Euclides Editor is implemented using ProseMirror marks. Marks are inline styles that can be applied to ranges of text without changing the document structure.
+
+### Mark Types in the Schema
+
+The editor includes these marks from `prosemirror-schema-basic`:
+
+- `strong` - Bold text (`<strong>`)
+- `em` - Italic text (`<em>`)
+- `code` - Inline code (`<code>`)
+- `link` - Hyperlinks (`<a>`)
+
+And custom marks:
+
+- `strike` - Strikethrough text (`<s>`)
+
+### Toggle Behavior
+
+All formatting methods use the `toggleMark` command, which means:
+
+- If the selection has the mark, it will be removed
+- If the selection doesn't have the mark, it will be added
+- If part of the selection has the mark, it will be applied to the entire selection
+
+## Implementation Details
+
+All formatting commands follow the same pattern:
+
+1. Create a command using ProseMirror's `toggleMark` function
+2. Pass the mark type from `EuclidesEditorSchema.marks`
+3. Execute the command with the current editor state
+4. Return `true` if successful
+
+**Source:** `~/workspace/source/projects/euclides-rich-editor/src/lib/core/editor-commands.service.ts:23-44`
+
+## Best Practices
+
+<Steps>
+  <Step title="Always refocus the editor">
+    After applying formatting, call `this.view.focus()` to return focus to the editor:
+    
+    ```typescript
+    if (this.editorCommandsService.toggleBold(this.view)) {
+      this.view.focus();
+    }
+    ```
+  </Step>
+  
+  <Step title="Check the return value">
+    Formatting methods return `boolean` to indicate success. Only refocus if the command succeeded:
+    
+    ```typescript
+    if (this.editorCommandsService.toggleStrike(this.view)) {
+      // Command succeeded, safe to refocus
+      this.view.focus();
+    }
+    ```
+  </Step>
+  
+  <Step title="Use with keyboard shortcuts">
+    Combine these methods with Angular event handlers for keyboard shortcuts:
+    
+    ```typescript
+    @HostListener('window:keydown.control.b', ['$event'])
+    onCtrlB(event: KeyboardEvent) {
+      event.preventDefault();
+      this.toggleBold();
+    }
+    ```
+  </Step>
+</Steps>
+
+## Next Steps
+
+- Learn about [Text Alignment](/guides/text-alignment) for block-level formatting
+- Explore [Links](/guides/links) for creating hyperlinks
+- See [Custom Schema](/guides/custom-schema) to add your own marks like underline or highlight

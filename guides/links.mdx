@@ -1,0 +1,467 @@
+---
+title: Links
+description: Create, edit, and remove hyperlinks in Euclides Rich Editor
+---
+
+## Overview
+
+Euclides Rich Editor provides a complete link management system with methods to open a link popover, apply links to text, and remove existing links. Links are implemented as marks in ProseMirror, allowing them to span across text selections.
+
+## Link Management Methods
+
+The editor component provides three main methods for working with links:
+
+### Opening the Link Popover
+
+```typescript
+openLinkPopover() {
+  const { state } = this.view;
+
+  const linkInfo = getLinkRange(state);
+  this.currentLink = linkInfo?.link.attrs['href'] ?? '';
+  this.showLinkPopover = true;
+}
+```
+
+**Source:** `~/workspace/source/projects/euclides-rich-editor/src/lib/components/euclides-editor/euclides-rich-editor.component.ts:85-91`
+
+This method:
+
+1. Gets the current editor state
+2. Uses `getLinkRange` to check if the cursor is within a link
+3. Extracts the current URL if editing an existing link
+4. Shows the link popover UI
+
+### Applying a Link
+
+```typescript
+applyLink(url: string) {
+  const { state, dispatch } = this.view;
+
+  const linkInfo = getLinkRange(state);
+
+  const href = url.startsWith('http')
+    ? url
+    : 'https://' + url;
+
+  if (linkInfo) {
+    const { start, end, link } = linkInfo;
+
+    dispatch(
+      state.tr
+        .removeMark(start, end, state.schema.marks['link'])
+        .addMark(
+          start,
+          end,
+          state.schema.marks['link'].create({
+            href,
+            title: link.attrs['title']
+          })
+        )
+    );
+  } else {
+    const from = state.selection.from;
+
+    const tr = state.tr.insertText(href, from);
+    tr.addMark(
+      from,
+      from + href.length,
+      state.schema.marks['link'].create({ href, title: href })
+    );
+
+    dispatch(tr);
+  }
+
+  this.view.focus();
+  this.closePopover();
+}
+```
+
+**Source:** `~/workspace/source/projects/euclides-rich-editor/src/lib/components/euclides-editor/euclides-rich-editor.component.ts:97-136`
+
+This method handles two scenarios:
+
+<Steps>
+  <Step title="Updating existing link">
+    If cursor is within a link:
+    
+    1. Remove the old link mark
+    2. Create a new link mark with the updated URL
+    3. Preserve the existing title attribute
+  </Step>
+  
+  <Step title="Creating new link">
+    If no link exists:
+    
+    1. Insert the URL as text
+    2. Apply the link mark to the inserted text
+    3. Set both `href` and `title` to the URL
+  </Step>
+</Steps>
+
+<Note>
+The method automatically adds `https://` protocol if the URL doesn't start with `http`.
+</Note>
+
+### Removing a Link
+
+```typescript
+removeLink() {
+  const { state, dispatch } = this.view;
+  const linkInfo = getLinkRange(state);
+
+  if (!linkInfo) return;
+
+  dispatch(
+    state.tr.removeMark(
+      linkInfo.start,
+      linkInfo.end,
+      state.schema.marks['link']
+    )
+  );
+
+  this.closePopover();
+}
+```
+
+**Source:** `~/workspace/source/projects/euclides-rich-editor/src/lib/components/euclides-editor/euclides-rich-editor.component.ts:138-153`
+
+This method:
+
+1. Gets the link range under the cursor
+2. Removes the link mark from that range
+3. Closes the popover UI
+
+## Understanding getLinkRange
+
+The `getLinkRange` utility is crucial for link operations:
+
+```typescript
+export function getLinkRange(state: EditorState) {
+  const { $from } = state.selection;
+  const link = $from.marks().find(m => m.type === state.schema.marks['link']);
+  if (!link) return null;
+
+  let start = $from.pos;
+  let end = $from.pos;
+
+  // ⬅️ Expand to the left
+  while (start > 0) {
+    const marks = state.doc.resolve(start - 1).marks();
+    if (!marks.some(m => m.type === link.type)) break;
+    start--;
+  }
+
+  // ➡️ Expand to the right
+  while (end < state.doc.content.size) {
+    const marks = state.doc.resolve(end).marks();
+    if (!marks.some(m => m.type === link.type)) break;
+    end++;
+  }
+
+  return { start, end, link };
+}
+```
+
+**Source:** `~/workspace/source/projects/euclides-rich-editor/src/lib/core/utils/get-link-range.ts:3-26`
+
+### How It Works
+
+<Steps>
+  <Step title="Check for link mark">
+    First, check if the cursor position has a link mark:
+    
+    ```typescript
+    const link = $from.marks().find(m => m.type === state.schema.marks['link']);
+    if (!link) return null;
+    ```
+  </Step>
+  
+  <Step title="Expand left">
+    Walk backwards to find the start of the link:
+    
+    ```typescript
+    while (start > 0) {
+      const marks = state.doc.resolve(start - 1).marks();
+      if (!marks.some(m => m.type === link.type)) break;
+      start--;
+    }
+    ```
+  </Step>
+  
+  <Step title="Expand right">
+    Walk forwards to find the end of the link:
+    
+    ```typescript
+    while (end < state.doc.content.size) {
+      const marks = state.doc.resolve(end).marks();
+      if (!marks.some(m => m.type === link.type)) break;
+      end++;
+    }
+    ```
+  </Step>
+  
+  <Step title="Return range">
+    Return the start position, end position, and link mark:
+    
+    ```typescript
+    return { start, end, link };
+    ```
+  </Step>
+</Steps>
+
+<Tip>
+This bidirectional expansion ensures that the entire link is selected, even if the cursor is positioned in the middle of the linked text.
+</Tip>
+
+## Link Attributes
+
+Links in ProseMirror have two attributes:
+
+```typescript
+{
+  href: string,   // The URL
+  title: string   // The title attribute (optional)
+}
+```
+
+Access these attributes from the link mark:
+
+```typescript
+const href = linkInfo.link.attrs['href'];
+const title = linkInfo.link.attrs['title'];
+```
+
+## Link Mark in the Schema
+
+The link mark comes from `prosemirror-schema-basic` and is automatically included in the schema:
+
+```typescript
+export const EuclidesEditorSchema = new Schema({
+  nodes: addListNodes(nodes, "paragraph block*", "block"),
+  marks: basicSchema.spec.marks.addToEnd("strike", strike),
+});
+```
+
+The `basicSchema.spec.marks` includes:
+
+- `strong` (bold)
+- `em` (italic)
+- `link` (hyperlinks)
+- `code` (inline code)
+
+And the custom `strike` mark is added at the end.
+
+## Complete Usage Example
+
+```typescript
+import { Component, ViewChild, ElementRef } from '@angular/core';
+import { EditorView } from 'prosemirror-view';
+import { EditorCommandsService } from 'euclides-rich-editor';
+import { getLinkRange } from 'euclides-rich-editor/utils';
+
+@Component({
+  selector: 'app-editor',
+  template: `
+    <div #editor></div>
+    
+    <button (click)="openLinkPopover()">Add Link</button>
+    
+    <div *ngIf="showLinkPopover" class="popover">
+      <input 
+        [(ngModel)]="currentLink" 
+        placeholder="Enter URL"
+      />
+      <button (click)="applyLink(currentLink)">Apply</button>
+      <button (click)="removeLink()">Remove</button>
+      <button (click)="closePopover()">Cancel</button>
+    </div>
+  `
+})
+export class EditorComponent {
+  @ViewChild('editor') editorRef!: ElementRef;
+  
+  view!: EditorView;
+  showLinkPopover = false;
+  currentLink = '';
+  
+  constructor(
+    private editorCommandsService: EditorCommandsService
+  ) {}
+  
+  openLinkPopover() {
+    const { state } = this.view;
+    const linkInfo = getLinkRange(state);
+    this.currentLink = linkInfo?.link.attrs['href'] ?? '';
+    this.showLinkPopover = true;
+  }
+  
+  applyLink(url: string) {
+    const { state, dispatch } = this.view;
+    const linkInfo = getLinkRange(state);
+    
+    const href = url.startsWith('http') ? url : 'https://' + url;
+    
+    if (linkInfo) {
+      // Update existing link
+      const { start, end, link } = linkInfo;
+      dispatch(
+        state.tr
+          .removeMark(start, end, state.schema.marks['link'])
+          .addMark(
+            start,
+            end,
+            state.schema.marks['link'].create({
+              href,
+              title: link.attrs['title']
+            })
+          )
+      );
+    } else {
+      // Create new link
+      const from = state.selection.from;
+      const tr = state.tr.insertText(href, from);
+      tr.addMark(
+        from,
+        from + href.length,
+        state.schema.marks['link'].create({ href, title: href })
+      );
+      dispatch(tr);
+    }
+    
+    this.view.focus();
+    this.closePopover();
+  }
+  
+  removeLink() {
+    const { state, dispatch } = this.view;
+    const linkInfo = getLinkRange(state);
+    
+    if (!linkInfo) return;
+    
+    dispatch(
+      state.tr.removeMark(
+        linkInfo.start,
+        linkInfo.end,
+        state.schema.marks['link']
+      )
+    );
+    
+    this.closePopover();
+  }
+  
+  closePopover() {
+    this.showLinkPopover = false;
+  }
+}
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Always normalize URLs">
+    Ensure URLs have a proper protocol:
+    
+    ```typescript
+    const href = url.startsWith('http')
+      ? url
+      : 'https://' + url;
+    ```
+  </Step>
+  
+  <Step title="Check for existing links">
+    Use `getLinkRange` to determine if editing or creating:
+    
+    ```typescript
+    const linkInfo = getLinkRange(state);
+    if (linkInfo) {
+      // Update existing
+    } else {
+      // Create new
+    }
+    ```
+  </Step>
+  
+  <Step title="Preserve title attributes">
+    When updating links, keep the original title:
+    
+    ```typescript
+    state.schema.marks['link'].create({
+      href: newUrl,
+      title: link.attrs['title']  // Preserve
+    })
+    ```
+  </Step>
+  
+  <Step title="Refocus after operations">
+    Always return focus to the editor:
+    
+    ```typescript
+    this.view.focus();
+    this.closePopover();
+    ```
+  </Step>
+</Steps>
+
+## Advanced: Keyboard Shortcuts
+
+Add keyboard support for link operations:
+
+```typescript
+@HostListener('window:keydown.control.k', ['$event'])
+onCtrlK(event: KeyboardEvent) {
+  event.preventDefault();
+  
+  const { state } = this.view;
+  const linkInfo = getLinkRange(state);
+  
+  if (linkInfo) {
+    // Edit existing link
+    this.openLinkPopover();
+  } else if (!state.selection.empty) {
+    // Create link from selection
+    this.openLinkPopover();
+  }
+}
+```
+
+## Link Popover Component
+
+The editor includes a basic link popover component:
+
+```typescript
+@Component({
+  selector: 'app-link-popover',
+  standalone: true,
+  templateUrl: './link-popover.component.html'
+})
+export class LinkPopoverComponent {
+  visible = input<boolean>(false);
+  initialUrl = input<string>('');
+
+  confirm = output<string>();
+  cancel = output<void>();
+  remove = output<void>();
+
+  url = signal<string>('');
+
+  constructor() {
+    effect(() => {
+      this.url.set(this.initialUrl());
+    });
+  }
+
+  onConfirm() {
+    if (!this.url()) return;
+    this.confirm.emit(this.url());
+  }
+}
+```
+
+**Source:** `~/workspace/source/projects/euclides-rich-editor/src/lib/components/link-popover/link-popover.component.ts:11-31`
+
+## Next Steps
+
+- Learn about [Text Formatting](/guides/text-formatting) to style linked text
+- See [Custom Schema](/guides/custom-schema) to customize link behavior
+- Explore [Lists](/guides/lists) to add links within list items

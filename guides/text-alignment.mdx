@@ -1,0 +1,230 @@
+---
+title: Text Alignment
+description: Control paragraph alignment in Euclides Rich Editor with custom node attributes
+---
+
+## Overview
+
+Text alignment in Euclides Rich Editor is implemented as a custom attribute on the `paragraph` node. Unlike marks (which format text), node attributes modify the entire block structure.
+
+## Using setTextAlign
+
+The `setTextAlign` method changes the alignment of the current paragraph:
+
+```typescript
+setTextAlign(align: string, view: EditorView): boolean {
+    return setBlockType(EuclidesEditorSchema.nodes['paragraph'], { textAlign: align })(view.state, view.dispatch);
+}
+```
+
+**Usage in your component:**
+
+```typescript
+import { EditorCommandsService } from 'euclides-rich-editor';
+
+toggleAlign(align: string) {
+  if (this.editorCommandsService.setTextAlign(align, this.view)) {
+    this.view.focus();
+  }
+}
+```
+
+**Example with buttons:**
+
+```html
+<button (click)="toggleAlign('left')">Align Left</button>
+<button (click)="toggleAlign('center')">Align Center</button>
+<button (click)="toggleAlign('right')">Align Right</button>
+<button (click)="toggleAlign('justify')">Justify</button>
+```
+
+<Note>
+The `setTextAlign` method accepts any string value for alignment. Common values are: `'left'`, `'center'`, `'right'`, and `'justify'`.
+</Note>
+
+## How Alignment Works in the Schema
+
+### Custom Paragraph Node
+
+Euclides Editor extends the default paragraph node to include a `textAlign` attribute:
+
+```typescript
+const paragraph: NodeSpec = {
+  ...schema.spec.nodes.get('paragraph'),  // Base configuration
+  attrs: {
+    // Add custom textAlign attribute
+    textAlign: { default: 'left' }
+  },
+  // Convert HTML to ProseMirror document
+  parseDOM: [
+    {
+      tag: "p",
+      getAttrs: (dom: HTMLElement) => ({
+        textAlign: dom.style.textAlign || "left"
+      })
+    }
+  ],
+  // Convert ProseMirror document to HTML
+  toDOM(node: Node) {
+    return [
+      "p",
+      { style: `text-align:${node.attrs['textAlign']}` },
+      0
+    ]
+  }
+}
+```
+
+**Source:** `~/workspace/source/projects/euclides-rich-editor/src/lib/engine/schema/euclides-schema.ts:10-34`
+
+### Understanding the Implementation
+
+<Steps>
+  <Step title="Define the attribute">
+    The `attrs` object adds a `textAlign` property with a default value of `'left'`:
+    
+    ```typescript
+    attrs: {
+      textAlign: { default: 'left' }
+    }
+    ```
+  </Step>
+  
+  <Step title="Parse from HTML">
+    When loading HTML content, the `parseDOM` rule extracts the alignment from the `text-align` CSS property:
+    
+    ```typescript
+    getAttrs: (dom: HTMLElement) => ({
+      textAlign: dom.style.textAlign || "left"
+    })
+    ```
+  </Step>
+  
+  <Step title="Render to HTML">
+    When converting the document to HTML, the `toDOM` method applies the alignment as an inline style:
+    
+    ```typescript
+    toDOM(node: Node) {
+      return [
+        "p",
+        { style: `text-align:${node.attrs['textAlign']}` },
+        0  // Content goes here
+      ]
+    }
+    ```
+  </Step>
+</Steps>
+
+## Marks vs. Node Attributes
+
+It's important to understand why alignment is a node attribute rather than a mark:
+
+| Feature | Marks | Node Attributes |
+|---------|-------|------------------|
+| **Scope** | Inline text within a block | Entire block |
+| **Examples** | Bold, italic, strikethrough | Text alignment, indentation |
+| **HTML Output** | Wraps text: `<strong>text</strong>` | Block properties: `<p style="text-align:center">` |
+| **Toggle** | Can be partial within a block | Applies to whole paragraph |
+
+<Tip>
+**Rule of thumb:** If it modifies individual words or phrases, use a **mark**. If it modifies the entire block structure, use a **node attribute**.
+</Tip>
+
+## Implementation Pattern
+
+The alignment system uses ProseMirror's `setBlockType` command:
+
+```typescript
+setBlockType(
+  EuclidesEditorSchema.nodes['paragraph'],  // Node type
+  { textAlign: align }                       // New attributes
+)(view.state, view.dispatch)
+```
+
+This command:
+
+1. Takes the current selection
+2. Converts it to a paragraph node (if it isn't already)
+3. Sets the `textAlign` attribute to the specified value
+4. Returns `true` if successful
+
+## Storage in the Document
+
+Alignment is stored directly in the document structure:
+
+```json
+{
+  "type": "paragraph",
+  "attrs": {
+    "textAlign": "center"
+  },
+  "content": [
+    { "type": "text", "text": "This text is centered" }
+  ]
+}
+```
+
+This means:
+
+- Alignment persists when you save the document
+- It survives copy/paste operations
+- It's preserved when converting to/from HTML
+
+## Best Practices
+
+<Steps>
+  <Step title="Always provide valid alignment values">
+    Use standard CSS text-align values:
+    
+    ```typescript
+    type TextAlign = 'left' | 'center' | 'right' | 'justify';
+    
+    toggleAlign(align: TextAlign) {
+      this.editorCommandsService.setTextAlign(align, this.view);
+    }
+    ```
+  </Step>
+  
+  <Step title="Refocus after alignment changes">
+    Just like with marks, refocus the editor after changing alignment:
+    
+    ```typescript
+    if (this.editorCommandsService.setTextAlign(align, this.view)) {
+      this.view.focus();
+    }
+    ```
+  </Step>
+  
+  <Step title="Consider heading support">
+    Currently, alignment only works on paragraphs. To support headings, you'd need to add the `textAlign` attribute to heading nodes as well. See [Custom Schema](/guides/custom-schema) for details.
+  </Step>
+</Steps>
+
+## Advanced: Reading Current Alignment
+
+To read the current paragraph's alignment:
+
+```typescript
+getCurrentAlignment(): string {
+  const { state } = this.view;
+  const { $from } = state.selection;
+  
+  if ($from.parent.type.name === 'paragraph') {
+    return $from.parent.attrs['textAlign'];
+  }
+  
+  return 'left';  // Default
+}
+```
+
+This is useful for:
+
+- Highlighting the active alignment button
+- Displaying current formatting state
+- Conditional UI updates
+
+## Next Steps
+
+- Learn about [Text Formatting](/guides/text-formatting) for inline styles
+- See [Custom Schema](/guides/custom-schema) to add alignment to other node types
+- Explore [Lists](/guides/lists) to understand more node types

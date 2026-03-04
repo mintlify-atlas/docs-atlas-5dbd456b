@@ -1,0 +1,241 @@
+---
+title: 'EditorCommandsService'
+description: 'Injectable service for executing editor commands in Euclides Rich Editor'
+---
+
+## Overview
+
+`EditorCommandsService` is an Angular injectable service that provides methods to execute formatting and structural commands in the ProseMirror editor. It wraps ProseMirror commands with a clean API for toggling marks, changing block types, and managing lists.
+
+```typescript
+@Injectable({ providedIn: 'root' })
+export class EditorCommandsService
+```
+
+## How Commands Work
+
+All methods in this service follow the ProseMirror `Command` pattern:
+
+```typescript
+type Command = (
+  state: EditorState,    // current editor state (document + selection)
+  dispatch?: (tr: Transaction) => void,  // function to apply a transaction
+  view?: EditorView      // visual editor instance (DOM access)
+) => boolean;            // returns true if command executed
+```
+
+Each method:
+- Takes an `EditorView` parameter to access the editor state and dispatch function
+- Returns `boolean` indicating whether the command was successfully executed
+- Uses the `EuclidesEditorSchema` to reference marks and nodes
+
+---
+
+## Methods
+
+### toggleBold
+
+Toggles bold formatting (strong mark) on the current selection.
+
+```typescript
+toggleBold(view: EditorView): boolean
+```
+
+<ParamField path="view" type="EditorView" required>
+  The ProseMirror EditorView instance containing the editor state and dispatch function.
+</ParamField>
+
+<ResponseField name="return" type="boolean">
+  Returns `true` if the bold mark was successfully toggled, `false` otherwise.
+</ResponseField>
+
+**Implementation:**
+```typescript
+const command: Command = toggleMark(EuclidesEditorSchema.marks['strong'])
+return command(view.state, view.dispatch)
+```
+
+---
+
+### toggleItailc
+
+Toggles italic formatting (em mark) on the current selection.
+
+```typescript
+toggleItailc(view: EditorView): boolean
+```
+
+<ParamField path="view" type="EditorView" required>
+  The ProseMirror EditorView instance containing the editor state and dispatch function.
+</ParamField>
+
+<ResponseField name="return" type="boolean">
+  Returns `true` if the italic mark was successfully toggled, `false` otherwise.
+</ResponseField>
+
+**Implementation:**
+```typescript
+const command: Command = toggleMark(EuclidesEditorSchema.marks['em'])
+return command(view.state, view.dispatch)
+```
+
+---
+
+### toggleStrike
+
+Toggles strikethrough formatting (strike mark) on the current selection.
+
+```typescript
+toggleStrike(view: EditorView): boolean
+```
+
+<ParamField path="view" type="EditorView" required>
+  The ProseMirror EditorView instance containing the editor state and dispatch function.
+</ParamField>
+
+<ResponseField name="return" type="boolean">
+  Returns `true` if the strikethrough mark was successfully toggled, `false` otherwise.
+</ResponseField>
+
+**Implementation:**
+```typescript
+const command: Command = toggleMark(EuclidesEditorSchema.marks['strike'])
+return command(view.state, view.dispatch)
+```
+
+---
+
+### setTextAlign
+
+Sets the text alignment for the current paragraph block.
+
+```typescript
+setTextAlign(align: string, view: EditorView): boolean
+```
+
+<ParamField path="align" type="string" required>
+  The alignment value to apply (e.g., `'left'`, `'center'`, `'right'`, `'justify'`).
+</ParamField>
+
+<ParamField path="view" type="EditorView" required>
+  The ProseMirror EditorView instance containing the editor state and dispatch function.
+</ParamField>
+
+<ResponseField name="return" type="boolean">
+  Returns `true` if the text alignment was successfully set, `false` otherwise.
+</ResponseField>
+
+**Implementation:**
+```typescript
+return setBlockType(
+  EuclidesEditorSchema.nodes['paragraph'], 
+  { textAlign: align }
+)(view.state, view.dispatch);
+```
+
+---
+
+### toggleCodeBlock
+
+Converts the current block into a code block or reverts it back to a paragraph.
+
+```typescript
+toggleCodeBlock(view: EditorView): boolean
+```
+
+<ParamField path="view" type="EditorView" required>
+  The ProseMirror EditorView instance containing the editor state and dispatch function.
+</ParamField>
+
+<ResponseField name="return" type="boolean">
+  Returns `true` if the code block was successfully toggled, `false` otherwise.
+</ResponseField>
+
+**Implementation:**
+```typescript
+return CommandsMethods.turnIntoCodeBlock(
+  EuclidesEditorSchema
+)(view.state, view.dispatch);
+```
+
+---
+
+### toggleList
+
+Toggles a list of the specified type (ordered, bullet, or task list).
+
+```typescript
+toggleList(type: list, view: EditorView): boolean
+```
+
+<ParamField path="type" type="list" required>
+  The type of list to toggle. Must be one of:
+  - `'ordered_list'` - Numbered list
+  - `'bullet_list'` - Bulleted list
+  - `'task_list'` - Checkbox task list
+</ParamField>
+
+<ParamField path="view" type="EditorView" required>
+  The ProseMirror EditorView instance containing the editor state and dispatch function.
+</ParamField>
+
+<ResponseField name="return" type="boolean">
+  Returns `true` if the list was successfully toggled, `false` otherwise.
+</ResponseField>
+
+**Type Definition:**
+```typescript
+type list = 'ordered_list' | 'bullet_list' | 'task_list'
+```
+
+**Implementation:**
+```typescript
+return CommandsMethods.switchList(
+  EuclidesEditorSchema.nodes[type]
+)(view.state, view.dispatch);
+```
+
+---
+
+## Usage Example
+
+```typescript
+import { Component } from '@angular/core';
+import { EditorView } from 'prosemirror-view';
+import { EditorCommandsService } from './editor-commands.service';
+
+@Component({
+  selector: 'app-editor',
+  template: `
+    <button (click)="makeBold()">Bold</button>
+    <button (click)="makeItalic()">Italic</button>
+    <button (click)="addBulletList()">Bullet List</button>
+  `
+})
+export class EditorComponent {
+  editorView: EditorView;
+
+  constructor(private commands: EditorCommandsService) {}
+
+  makeBold() {
+    const success = this.commands.toggleBold(this.editorView);
+    if (!success) {
+      console.log('Bold command could not be executed');
+    }
+  }
+
+  makeItalic() {
+    this.commands.toggleItailc(this.editorView);
+  }
+
+  addBulletList() {
+    this.commands.toggleList('bullet_list', this.editorView);
+  }
+}
+```
+
+## Dependencies
+
+- **ProseMirror**: Uses `EditorView` from `prosemirror-view` and commands from `prosemirror-commands`
+- **EuclidesEditorSchema**: The custom schema defining all marks and nodes for the editor
+- **CommandsMethods**: Custom command implementations for complex operations like code blocks and lists

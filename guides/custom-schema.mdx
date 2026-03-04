@@ -1,0 +1,573 @@
+---
+title: Custom Schema
+description: Extend Euclides Rich Editor by adding custom nodes and marks to the ProseMirror schema
+---
+
+## Overview
+
+The schema is the "dictionary" of the editor - it defines what nodes (blocks) and marks (inline styles) exist in your editor. Euclides Rich Editor is built on ProseMirror and extends the basic schema with custom functionality.
+
+## Understanding the Schema
+
+The schema consists of two main parts:
+
+### Nodes (Blocks)
+
+Nodes are structural elements that create blocks or containers.
+
+**Examples:** `<p>`, `<h1>`, `<ul>`, `<li>`, `<blockquote>`, `<pre>`
+
+### Marks (Inline Styles)
+
+Marks are formatting that applies to text within a block.
+
+**Examples:** `<strong>`, `<em>`, `<a>`, `<code>`, `<s>`
+
+<Tip>
+**Rule of thumb:** If it modifies individual letters or words, use a **mark**. If it modifies the entire block structure, use a **node**.
+</Tip>
+
+## Euclides Schema Implementation
+
+```typescript
+import { NodeSpec, Schema } from 'prosemirror-model';
+import { schema as basicSchema } from 'prosemirror-schema-basic';
+import { addListNodes } from 'prosemirror-schema-list';
+import type { MarkSpec, Node } from 'prosemirror-model'
+
+const paragraph: NodeSpec = {
+  ...schema.spec.nodes.get('paragraph'),
+  attrs: {
+    textAlign: { default: 'left' }
+  },
+  parseDOM: [
+    {
+      tag: "p",
+      getAttrs: (dom: HTMLElement) => ({
+        textAlign: dom.style.textAlign || "left"
+      })
+    }
+  ],
+  toDOM(node: Node) {
+    return [
+      "p",
+      { style: `text-align:${node.attrs['textAlign']}` },
+      0
+    ]
+  }
+}
+
+const strike: MarkSpec = {
+  parseDOM: [
+    { tag: "s" },
+    { tag: "del" },
+    { style: "text-decoration=line-through" }
+  ],
+  toDOM() {
+    return ["s", 0];
+  }
+};
+
+const nodes = basicSchema.spec.nodes.update("paragraph", paragraph);
+
+export const EuclidesEditorSchema = new Schema({
+  nodes: addListNodes(nodes, "paragraph block*", "block"),
+  marks: basicSchema.spec.marks.addToEnd("strike", strike),
+});
+```
+
+**Source:** `~/workspace/source/projects/euclides-rich-editor/src/lib/engine/schema/euclides-schema.ts`
+
+## What Comes from prosemirror-schema-basic
+
+### Built-in Nodes
+
+- ✅ `doc` - Document root
+- ✅ `paragraph` - Text paragraphs
+- ✅ `heading` - Headings (h1-h6)
+- ✅ `blockquote` - Block quotes
+- ✅ `horizontal_rule` - Horizontal lines
+- ✅ `code_block` - Code blocks
+- ✅ `image` - Images
+- ✅ `hard_break` - Line breaks
+- ✅ `text` - Text content
+
+### Built-in Marks
+
+- ✅ `strong` - Bold text
+- ✅ `em` - Italic text
+- ✅ `link` - Hyperlinks
+- ✅ `code` - Inline code
+
+## Adding Custom Marks
+
+Marks modify text within a block without changing the structure.
+
+### Example: Strike Mark
+
+Euclides Editor adds strikethrough as a custom mark:
+
+<Steps>
+  <Step title="Define the mark specification">
+    Create a `MarkSpec` that defines how to parse and render the mark:
+    
+    ```typescript
+    const strike: MarkSpec = {
+      parseDOM: [
+        { tag: "s" },
+        { tag: "del" },
+        { style: "text-decoration=line-through" }
+      ],
+      toDOM() {
+        return ["s", 0];
+      }
+    };
+    ```
+    
+    - `parseDOM`: Rules for converting HTML to ProseMirror
+    - `toDOM`: How to render the mark in HTML
+    - `0`: Placeholder for content
+  </Step>
+  
+  <Step title="Add to schema">
+    Use `addToEnd` to add the mark to the marks collection:
+    
+    ```typescript
+    marks: basicSchema.spec.marks.addToEnd("strike", strike)
+    ```
+  </Step>
+  
+  <Step title="Use in commands">
+    Access the mark through the schema:
+    
+    ```typescript
+    toggleStrike(view: EditorView): boolean {
+        const command: Command = toggleMark(EuclidesEditorSchema.marks['strike'])
+        return command(view.state, view.dispatch)   
+    }
+    ```
+  </Step>
+</Steps>
+
+### Example: Underline Mark
+
+Add underline support to your editor:
+
+```typescript
+const underline: MarkSpec = {
+  parseDOM: [
+    { tag: "u" },
+    { style: "text-decoration=underline" }
+  ],
+  toDOM() {
+    return ["u", 0];
+  }
+};
+
+// Add to schema
+const marks = basicSchema.spec.marks
+  .addToEnd("strike", strike)
+  .addToEnd("underline", underline);
+
+export const EuclidesEditorSchema = new Schema({
+  nodes: addListNodes(nodes, "paragraph block*", "block"),
+  marks: marks,
+});
+```
+
+### Example: Text Color Mark
+
+Add color support with attributes:
+
+```typescript
+const textColor: MarkSpec = {
+  attrs: {
+    color: { default: "#000000" }
+  },
+  parseDOM: [
+    {
+      tag: "span[style*=color]",
+      getAttrs: (dom: HTMLElement) => ({
+        color: dom.style.color
+      })
+    }
+  ],
+  toDOM(mark) {
+    return [
+      "span",
+      { style: `color: ${mark.attrs.color}` },
+      0
+    ];
+  }
+};
+```
+
+Use with a command:
+
+```typescript
+setTextColor(color: string, view: EditorView): boolean {
+  const { state, dispatch } = view;
+  const { from, to } = state.selection;
+  
+  const mark = state.schema.marks.textColor.create({ color });
+  dispatch(state.tr.addMark(from, to, mark));
+  
+  return true;
+}
+```
+
+## Adding Custom Nodes
+
+Nodes create block-level structures or new content types.
+
+### Example: Custom Paragraph with Text Align
+
+Euclides Editor extends the paragraph node:
+
+<Steps>
+  <Step title="Extend the base node">
+    Start with the default paragraph specification:
+    
+    ```typescript
+    const paragraph: NodeSpec = {
+      ...schema.spec.nodes.get('paragraph'),
+      // Add customizations below
+    }
+    ```
+  </Step>
+  
+  <Step title="Add custom attributes">
+    Define new attributes for the node:
+    
+    ```typescript
+    attrs: {
+      textAlign: { default: 'left' }
+    }
+    ```
+  </Step>
+  
+  <Step title="Define parsing rules">
+    Convert HTML to ProseMirror:
+    
+    ```typescript
+    parseDOM: [
+      {
+        tag: "p",
+        getAttrs: (dom: HTMLElement) => ({
+          textAlign: dom.style.textAlign || "left"
+        })
+      }
+    ]
+    ```
+  </Step>
+  
+  <Step title="Define rendering rules">
+    Convert ProseMirror to HTML:
+    
+    ```typescript
+    toDOM(node: Node) {
+      return [
+        "p",
+        { style: `text-align:${node.attrs['textAlign']}` },
+        0  // Content placeholder
+      ]
+    }
+    ```
+  </Step>
+  
+  <Step title="Update the schema">
+    Replace the default paragraph node:
+    
+    ```typescript
+    const nodes = basicSchema.spec.nodes.update("paragraph", paragraph);
+    ```
+  </Step>
+</Steps>
+
+### Example: Warning Block
+
+Create a custom warning block node:
+
+```typescript
+const warningBlock: NodeSpec = {
+  group: "block",
+  content: "inline*",
+  attrs: {
+    type: { default: "warning" }
+  },
+  parseDOM: [
+    {
+      tag: "div.warning",
+      getAttrs: (dom: HTMLElement) => ({
+        type: dom.getAttribute("data-type") || "warning"
+      })
+    }
+  ],
+  toDOM(node) {
+    return [
+      "div",
+      {
+        class: "warning",
+        "data-type": node.attrs.type
+      },
+      0
+    ];
+  }
+};
+
+// Add to nodes
+const nodes = basicSchema.spec.nodes
+  .update("paragraph", paragraph)
+  .addToEnd("warning_block", warningBlock);
+
+export const EuclidesEditorSchema = new Schema({
+  nodes: addListNodes(nodes, "paragraph block*", "block"),
+  marks: basicSchema.spec.marks.addToEnd("strike", strike),
+});
+```
+
+Create a command to use it:
+
+```typescript
+toggleWarning(view: EditorView): boolean {
+  return setBlockType(
+    EuclidesEditorSchema.nodes['warning_block']
+  )(view.state, view.dispatch);
+}
+```
+
+## Integrating List Nodes
+
+Euclides uses `addListNodes` from `prosemirror-schema-list`:
+
+```typescript
+import { addListNodes } from 'prosemirror-schema-list';
+
+const nodes = basicSchema.spec.nodes.update("paragraph", paragraph);
+
+export const EuclidesEditorSchema = new Schema({
+  nodes: addListNodes(nodes, "paragraph block*", "block"),
+  marks: basicSchema.spec.marks.addToEnd("strike", strike),
+});
+```
+
+**What this does:**
+
+- Adds `bullet_list` node
+- Adds `ordered_list` node
+- Adds `list_item` node
+
+**Parameters:**
+
+```typescript
+addListNodes(
+  nodes,              // Existing nodes OrderedMap
+  "paragraph block*", // List items can contain paragraph + blocks
+  "block"            // Lists are block-level elements
+)
+```
+
+## Schema Patterns
+
+### Node Content Expressions
+
+Define what can be inside a node:
+
+```typescript
+// Only inline content (text and marks)
+content: "inline*"
+
+// Only block content
+content: "block+"
+
+// Paragraph followed by any blocks
+content: "paragraph block*"
+
+// Specific node types
+content: "heading paragraph+"
+
+// Empty node
+content: ""
+```
+
+### Node Groups
+
+Organize nodes into groups:
+
+```typescript
+// Block-level node
+group: "block"
+
+// Inline node
+group: "inline"
+
+// Multiple groups
+group: "block special"
+```
+
+### Mark Properties
+
+```typescript
+const customMark: MarkSpec = {
+  // Mark attributes
+  attrs: {
+    level: { default: 1 }
+  },
+  
+  // Can this mark span multiple blocks?
+  spanning: false,
+  
+  // Can multiple instances exist?
+  inclusive: true,
+  
+  // Exclude other marks
+  excludes: "_",  // All marks
+  excludes: "link",  // Specific mark
+  
+  // Parse from HTML
+  parseDOM: [
+    { tag: "span.custom" }
+  ],
+  
+  // Render to HTML
+  toDOM(mark) {
+    return ["span", { class: "custom" }, 0];
+  }
+};
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Start with existing nodes/marks">
+    Extend the basic schema rather than starting from scratch:
+    
+    ```typescript
+    const paragraph: NodeSpec = {
+      ...schema.spec.nodes.get('paragraph'),
+      // Your customizations
+    }
+    ```
+  </Step>
+  
+  <Step title="Define both parseDOM and toDOM">
+    Always provide bidirectional conversion:
+    
+    ```typescript
+    parseDOM: [{ tag: "s" }],  // HTML → ProseMirror
+    toDOM() { return ["s", 0]; }  // ProseMirror → HTML
+    ```
+  </Step>
+  
+  <Step title="Use meaningful defaults">
+    Provide sensible default values for attributes:
+    
+    ```typescript
+    attrs: {
+      textAlign: { default: 'left' },
+      level: { default: 1 }
+    }
+    ```
+  </Step>
+  
+  <Step title="Test HTML round-tripping">
+    Ensure content survives HTML → ProseMirror → HTML conversion:
+    
+    ```typescript
+    const html = '<p style="text-align:center">Test</p>';
+    const doc = DOMParser.fromSchema(schema).parse(html);
+    const output = DOMSerializer.fromSchema(schema).serializeNode(doc);
+    // output should match input
+    ```
+  </Step>
+</Steps>
+
+## Common Customizations
+
+### Things NOT in Basic Schema
+
+**Marks to add:**
+
+- ❌ Strike / strikethrough
+- ❌ Underline
+- ❌ Text color
+- ❌ Background / highlight
+- ❌ Font size
+- ❌ Font family
+
+**Nodes to add:**
+
+- ❌ Text alignment (added in Euclides)
+- ❌ Tables
+- ❌ Video embeds
+- ❌ Mentions (@user)
+- ❌ Custom blocks (warning, info, success)
+- ❌ Cards / previews
+- ❌ Columns / layouts
+- ❌ Task lists (defined but not implemented)
+
+## Advanced: Complete Custom Schema
+
+```typescript
+import { Schema } from 'prosemirror-model';
+import { schema as basicSchema } from 'prosemirror-schema-basic';
+import { addListNodes } from 'prosemirror-schema-list';
+
+// Custom paragraph with alignment
+const paragraph = {
+  ...basicSchema.spec.nodes.get('paragraph'),
+  attrs: { textAlign: { default: 'left' } },
+  parseDOM: [{
+    tag: "p",
+    getAttrs: (dom: HTMLElement) => ({
+      textAlign: dom.style.textAlign || "left"
+    })
+  }],
+  toDOM(node: Node) {
+    return ["p", { style: `text-align:${node.attrs.textAlign}` }, 0]
+  }
+};
+
+// Custom marks
+const strike = {
+  parseDOM: [{ tag: "s" }, { tag: "del" }],
+  toDOM() { return ["s", 0]; }
+};
+
+const underline = {
+  parseDOM: [{ tag: "u" }],
+  toDOM() { return ["u", 0]; }
+};
+
+const highlight = {
+  attrs: { color: { default: "yellow" } },
+  parseDOM: [{
+    tag: "mark",
+    getAttrs: (dom: HTMLElement) => ({
+      color: dom.style.backgroundColor || "yellow"
+    })
+  }],
+  toDOM(mark) {
+    return ["mark", { style: `background-color: ${mark.attrs.color}` }, 0];
+  }
+};
+
+// Build schema
+const nodes = basicSchema.spec.nodes.update("paragraph", paragraph);
+const marks = basicSchema.spec.marks
+  .addToEnd("strike", strike)
+  .addToEnd("underline", underline)
+  .addToEnd("highlight", highlight);
+
+export const CustomSchema = new Schema({
+  nodes: addListNodes(nodes, "paragraph block*", "block"),
+  marks: marks,
+});
+```
+
+## Next Steps
+
+- See [Text Formatting](/guides/text-formatting) to use custom marks
+- Learn [Text Alignment](/guides/text-alignment) implementation details
+- Explore [Lists](/guides/lists) to understand `addListNodes`
+- Read [Links](/guides/links) for mark-based features

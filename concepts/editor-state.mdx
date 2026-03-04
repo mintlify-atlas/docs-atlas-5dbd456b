@@ -1,0 +1,531 @@
+---
+title: Editor State
+description: Understanding EditorState, transactions, and state management in Euclides Rich Editor
+---
+
+The **EditorState** is the heart of ProseMirror. It's a complete, immutable snapshot of your editor at any moment in time. Understanding how state works is crucial for building features and debugging issues.
+
+## What is EditorState?
+
+EditorState is an immutable object that contains everything about your editor:
+
+1. **The document** - All content and structure
+2. **The selection** - Cursor position or text selection
+3. **Plugin state** - Data maintained by plugins
+4. **Stored marks** - Active formatting for next input
+
+<Note>
+Immutability is key: You never modify an EditorState. Every change creates a **new** state through a transaction.
+</Note>
+
+## Creating the Initial State
+
+In Euclides, the state is created in `EditorEngine.create()` (editor-engine.ts:20):
+
+```typescript
+import { EditorState } from "prosemirror-state";
+import { EuclidesEditorSchema } from "./schema/euclides-schema";
+import { buildPlugins } from "./plugins/euclides-plugins";
+
+static create(element: HTMLElement, stateService: EditorStateService): EditorView {
+  const state = EditorState.create({
+    // The Schema establishes document rules
+    schema: EuclidesEditorSchema,
+
+    /* 
+     * Plugins extend editor behavior:
+     * - Keyboard shortcuts
+     * - History (undo/redo)
+     * - Custom logic
+     * - Sync with EditorStateService (Angular)
+     */
+    plugins: buildPlugins(stateService)
+  });
+
+  return new EditorView(element, {
+    state,
+    attributes: { class: 'euclides-editor' }
+  });
+}
+```
+
+This creates a state with:
+
+- An empty document (following the schema's rules)
+- A selection at the start (position 0)
+- All plugins initialized
+
+## The Three Core Components
+
+### 1. Document
+
+The document is a **tree structure** of nodes defined by your schema:
+
+```typescript
+// Accessing the document
+const doc = state.doc;
+
+// Document properties
+console.log(doc.type.name);        // "doc" (root node)
+console.log(doc.content.size);     // Number of nodes
+console.log(doc.textContent);      // All text concatenated
+
+// Iterate through children
+doc.forEach((node, offset, index) => {
+  console.log(`Node ${index}: ${node.type.name}`);
+});
+```
+
+The document:
+
+- Must always match the schema rules
+- Cannot be partially invalid
+- Is never directly modified
+
+### 2. Selection
+
+The selection represents the cursor or highlighted text:
+
+```typescript
+const selection = state.selection;
+
+// Selection properties
+console.log(selection.from);       // Start position
+console.log(selection.to);         // End position
+console.log(selection.empty);      // True if cursor (not range)
+
+// Get selected text
+const selectedText = state.doc.textBetween(
+  selection.from,
+  selection.to
+);
+
+// Check what's around the selection
+const $from = selection.$from;     // "Resolved" position
+console.log($from.parent.type.name);  // Parent node type
+console.log($from.depth);          // Nesting depth
+```
+
+<Info>
+The `$` prefix (like `$from`) indicates a **resolved position** - a position that knows its context in the document tree. This is a ProseMirror convention.
+</Info>
+
+### 3. Plugins
+
+Plugins are initialized with the state and can store their own data. Euclides uses several plugins (euclides-plugins.ts:31):
+
+```typescript
+export function buildPlugins(stateService: EditorStateService) {
+  return [
+    buildEuclidesKeymap(EuclidesEditorSchema),  // Custom keyboard shortcuts
+    keymap(baseKeymap),                         // Base ProseMirror shortcuts
+    history(),                                  // Undo/redo functionality
+    buildHistoryStatePlugin(stateService),      // Sync with Angular
+  ];
+}
+```
+
+Each plugin can:
+
+- React to transactions
+- Store its own state
+- Intercept events
+- Provide commands
+
+## Transactions: The Only Way to Change State
+
+A **Transaction** (`tr`) is a description of changes to apply to a state. Transactions are the only way to create a new state.
+
+### Creating a Transaction
+
+```typescript
+// Start with current state
+const tr = state.tr;
+
+// Make changes
+tr.insertText("Hello", 1);           // Insert at position 1
+tr.delete(5, 10);                    // Delete from 5 to 10
+tr.addMark(1, 5, schema.marks.bold); // Apply bold
+
+// Apply the transaction
+const newState = state.apply(tr);
+```
+
+<Warning>
+The original `state` is unchanged! You must use `newState` going forward. In practice, the EditorView handles this for you.
+</Warning>
+
+### Example: Applying a Link
+
+Here's how Euclides applies a link mark (euclides-rich-editor.component.ts:106):
+
+```typescript
+applyLink(url: string) {
+  const { state, dispatch } = this.view;
+  const linkInfo = getLinkRange(state);
+
+  const href = url.startsWith('http')
+    ? url
+    : 'https://' + url;
+
+  if (linkInfo) {
+    const { start, end, link } = linkInfo;
+
+    // Create transaction
+    dispatch(
+      state.tr
+        .removeMark(start, end, state.schema.marks['link'])
+        .addMark(
+          start,
+          end,
+          state.schema.marks['link'].create({
+            href,
+            title: link.attrs['title']
+          })
+        )
+    );
+  } else {
+    const from = state.selection.from;
+
+    const tr = state.tr.insertText(href, from);
+    tr.addMark(
+      from,
+      from + href.length,
+      state.schema.marks['link'].create({ href, title: href })
+    );
+
+    dispatch(tr);
+  }
+
+  this.view.focus();
+  this.closePopover();
+}
+```
+
+This transaction:
+
+1. Removes any existing link mark
+2. Adds a new link mark with updated href
+3. Dispatches through `dispatch()` to apply it
+
+### The Dispatch Function
+
+The `dispatch` function is provided by EditorView:
+
+```typescript
+const { state, dispatch } = view;
+
+// Create and apply transaction
+dispatch(state.tr.insertText("Hello"));
+```
+
+When you call `dispatch(tr)`:
+
+1. Plugins get to see and modify the transaction
+2. A new state is created
+3. The EditorView updates to show the new state
+4. Plugin `appendTransaction` hooks can add follow-up changes
+
+## EditorStateService: Bridge to Angular
+
+Euclides uses an Angular service to expose editor state to components (editor-state.service.ts:4):
+
+```typescript
+import { Injectable, signal } from '@angular/core';
+
+@Injectable({ providedIn: 'root' })
+export class EditorStateService {
+  canUndo = signal(false);
+  canRedo = signal(false);
+}
+```
+
+This service:
+
+- Uses Angular **signals** for reactivity
+- Gets updated by plugins when state changes
+- Allows toolbar buttons to enable/disable based on state
+
+### History State Plugin
+
+The `buildHistoryStatePlugin` watches for state changes and updates the service:
+
+```typescript
+// Simplified example of what the plugin does
+function buildHistoryStatePlugin(stateService: EditorStateService) {
+  return new Plugin({
+    view() {
+      return {
+        update(view) {
+          const { state } = view;
+          
+          // Check if undo/redo are available
+          stateService.canUndo.set(undo(state));
+          stateService.canRedo.set(redo(state));
+        }
+      };
+    }
+  });
+}
+```
+
+Now Angular components can react:
+
+```html
+<button 
+  [disabled]="!editorStateService.canUndo()"
+  (click)="undo()">
+  Undo
+</button>
+```
+
+## State Updates Flow
+
+Here's the complete flow when the user types:
+
+```mermaid
+sequence
+    participant User
+    participant EditorView
+    participant Plugins
+    participant EditorState
+    participant Angular
+
+    User->>EditorView: Types "H"
+    EditorView->>EditorView: Create transaction
+    EditorView->>Plugins: Filter transaction
+    Plugins->>Plugins: Modify if needed
+    Plugins->>EditorState: Apply transaction
+    EditorState->>EditorState: Create new state
+    EditorState->>EditorView: Return new state
+    EditorView->>EditorView: Re-render DOM
+    EditorView->>Plugins: Notify of update
+    Plugins->>Angular: Update signals
+    Angular->>Angular: Re-render toolbar
+```
+
+## Working with State in Commands
+
+Commands are functions that take state and optionally dispatch:
+
+```typescript
+type Command = (
+  state: EditorState,
+  dispatch?: (tr: Transaction) => void,
+  view?: EditorView
+) => boolean;
+```
+
+The component calls commands through the service (euclides-rich-editor.component.ts:41):
+
+```typescript
+toggleBold() {
+  if (this.editorCommandsService.toggleBold(this.view)) {
+    this.view.focus();
+  }
+}
+
+toggleAlign(align: string) {
+  if (this.editorCommandsService.setTextAlign(align, this.view))
+    this.view.focus();
+}
+```
+
+A typical command implementation:
+
+```typescript
+// In EditorCommandsService
+toggleBold(view: EditorView): boolean {
+  const { state, dispatch } = view;
+  const markType = state.schema.marks.strong;
+  
+  // toggleMark is a ProseMirror command
+  return toggleMark(markType)(state, dispatch);
+}
+```
+
+Commands return `true` if they succeeded (state changed) or `false` if they couldn't apply (e.g., mark not allowed in current position).
+
+## State Inspection Patterns
+
+### Check Active Marks
+
+```typescript
+const { $from, $to } = state.selection;
+const boldMark = state.schema.marks.strong;
+
+const isBold = boldMark.isInSet(state.storedMarks || $from.marks());
+```
+
+### Check Current Node Type
+
+```typescript
+const { $from } = state.selection;
+const currentNode = $from.parent;
+
+if (currentNode.type === state.schema.nodes.heading) {
+  console.log(`Heading level: ${currentNode.attrs.level}`);
+}
+```
+
+### Get Node at Position
+
+```typescript
+const pos = 10;
+const resolvedPos = state.doc.resolve(pos);
+const nodeAtPos = resolvedPos.parent;
+
+console.log(`Node type: ${nodeAtPos.type.name}`);
+```
+
+## Undo/Redo with History
+
+The `history()` plugin tracks state changes (euclides-rich-editor.component.ts:72):
+
+```typescript
+import { undo, redo } from 'prosemirror-history';
+
+undo() {
+  if (undo(this.view.state, this.view.dispatch))
+    this.view.focus();
+}
+
+redo() {
+  if (redo(this.view.state, this.view.dispatch))
+    this.view.focus();
+}
+```
+
+The history plugin:
+
+- Stores previous states
+- Groups rapid changes (like typing) into single undo steps
+- Provides `undo` and `redo` commands
+- Can be configured with depth limits
+
+<Tip>
+History works automatically because EditorState is immutable. Old states are naturally preserved!
+</Tip>
+
+## State vs Props
+
+Be careful to distinguish:
+
+- **EditorState** - ProseMirror's immutable state
+- **Component state** - Angular component properties
+
+Example from the component (euclides-rich-editor.component.ts:82):
+
+```typescript
+// Angular component state (mutable)
+showLinkPopover: boolean = false;
+currentLink: string = '';
+
+// ProseMirror state (immutable, in this.view)
+openLinkPopover() {
+  const { state } = this.view;  // EditorState
+  
+  const linkInfo = getLinkRange(state);
+  this.currentLink = linkInfo?.link.attrs['href'] ?? '';
+  this.showLinkPopover = true;  // Component state
+}
+```
+
+## Why Immutability Matters
+
+<Accordion title="Undo/Redo is Free">
+  Since old states are preserved, undo is just "use the previous state". No need to track inverse operations.
+</Accordion>
+
+<Accordion title="Time-Travel Debugging">
+  You can store states and jump to any point in history. Invaluable for debugging complex interactions.
+</Accordion>
+
+<Accordion title="Predictable Updates">
+  No hidden mutations. Every change is explicit through transactions, making code easier to reason about.
+</Accordion>
+
+<Accordion title="Concurrent Editing">
+  Immutability makes collaborative editing possible. Changes are applied as transformations, not direct edits.
+</Accordion>
+
+<Accordion title="Plugin Composition">
+  Multiple plugins can inspect and modify the same transaction without stepping on each other's toes.
+</Accordion>
+
+## Common Patterns
+
+### Pattern: Command with Dispatch
+
+```typescript
+function myCommand(state: EditorState, dispatch?: Dispatch): boolean {
+  // Check if command can execute
+  if (!canExecute(state)) {
+    return false;
+  }
+  
+  // If dispatch provided, execute
+  if (dispatch) {
+    const tr = state.tr;
+    // ... make changes to tr
+    dispatch(tr);
+  }
+  
+  return true;
+}
+```
+
+### Pattern: Get Selection Content
+
+```typescript
+const { from, to } = state.selection;
+const selectedText = state.doc.textBetween(from, to);
+const selectedFragment = state.doc.slice(from, to).content;
+```
+
+### Pattern: Update Node Attributes
+
+```typescript
+const { $from } = state.selection;
+const pos = $from.before($from.depth);
+const node = $from.parent;
+
+const tr = state.tr.setNodeMarkup(
+  pos,
+  null,  // Keep same type
+  { ...node.attrs, textAlign: 'center' }  // Update attrs
+);
+
+dispatch(tr);
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Never Mutate" icon="lock">
+    Never modify state directly. Always create transactions.
+  </Card>
+  <Card title="Check Before Dispatch" icon="circle-check">
+    Commands should return false if they can't execute, true if they can.
+  </Card>
+  <Card title="Batch Changes" icon="layer-group">
+    Make multiple changes in one transaction, not separate transactions.
+  </Card>
+  <Card title="Use Commands" icon="terminal">
+    Prefer built-in commands over manual transaction building when possible.
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="sitemap" href="/concepts/architecture">
+    See how state fits into the overall architecture
+  </Card>
+  <Card title="Schema" icon="book" href="/concepts/schema">
+    Learn how schema defines document structure
+  </Card>
+  <Card title="Nodes vs Marks" icon="shapes" href="/concepts/nodes-vs-marks">
+    Understand content vs formatting
+  </Card>
+</CardGroup>

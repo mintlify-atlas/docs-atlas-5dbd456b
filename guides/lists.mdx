@@ -1,0 +1,364 @@
+---
+title: Lists
+description: Create and manage ordered and unordered lists in Euclides Rich Editor
+---
+
+## Overview
+
+Euclides Rich Editor supports both ordered and unordered lists through the `toggleList` method. List functionality is provided by ProseMirror's `prosemirror-schema-list` package and integrated into the custom schema.
+
+## Using toggleList
+
+The `toggleList` method creates or converts content to a list:
+
+```typescript
+toggleList(type: list, view: EditorView): boolean {
+   return CommandsMethods.switchList(EuclidesEditorSchema.nodes[type])(view.state, view.dispatch);
+}
+```
+
+**Usage in your component:**
+
+```typescript
+import { EditorCommandsService } from 'euclides-rich-editor';
+import { list } from 'euclides-rich-editor/core/types';
+
+toggleList(type: list) {
+  if (this.editorCommandsService.toggleList(type, this.view)) {
+    this.view.focus();
+  }
+}
+```
+
+**Example with buttons:**
+
+```html
+<button (click)="toggleList('bullet_list')">• Bullet List</button>
+<button (click)="toggleList('ordered_list')">1. Ordered List</button>
+```
+
+## List Types
+
+The editor defines a `list` type for supported list formats:
+
+```typescript
+export type list = 'ordered_list' | 'bullet_list' | 'task_list'
+```
+
+**Source:** `~/workspace/source/projects/euclides-rich-editor/src/lib/core/types/list.type.ts:1`
+
+<Note>
+Currently, the editor implements `ordered_list` and `bullet_list`. The `task_list` type is defined but not yet fully implemented.
+</Note>
+
+### Ordered Lists
+
+Numbered lists for sequential content:
+
+```typescript
+toggleList('ordered_list');
+```
+
+Generates HTML:
+```html
+<ol>
+  <li>First item</li>
+  <li>Second item</li>
+  <li>Third item</li>
+</ol>
+```
+
+### Unordered Lists
+
+Bullet lists for non-sequential content:
+
+```typescript
+toggleList('bullet_list');
+```
+
+Generates HTML:
+```html
+<ul>
+  <li>First item</li>
+  <li>Second item</li>
+  <li>Third item</li>
+</ul>
+```
+
+## How switchList Works
+
+The `switchList` method provides intelligent list toggling:
+
+```typescript
+static switchList(listType: NodeType): Command {
+    return (state, dispatch) => {
+        const { schema, selection } = state;
+        const { $from, from, to } = selection;
+
+        let tr = state.tr;
+
+        // Convert heading to paragraph first
+        if ($from.parent.type === schema.nodes['heading']) {
+            tr = tr.setBlockType(from, to, schema.nodes['paragraph']);
+        }
+
+        const resolved = tr.doc.resolve(tr.selection.from);
+        for (let d = resolved.depth; d > 0; d--) {
+            const node = resolved.node(d);
+
+            if (
+                node.type === schema.nodes['bullet_list'] ||
+                node.type === schema.nodes['ordered_list']
+            ) {
+                // If already this list type, lift it out
+                if (node.type === listType) {
+                    return liftListItem(schema.nodes['list_item'])(state, dispatch);
+                }
+
+                // Convert between list types
+                if (dispatch) {
+                    dispatch(tr.setNodeMarkup(resolved.before(d), listType));
+                }
+                return true;
+            }
+        }
+
+        // Not in a list, wrap in one
+        return wrapInList(listType)(state, dispatch);
+    };
+}
+```
+
+**Source:** `~/workspace/source/projects/euclides-rich-editor/src/lib/engine/commanmethods/command.methods.ts:60-92`
+
+### Behavior Patterns
+
+<Steps>
+  <Step title="Heading to List">
+    If the selection is in a heading, it's first converted to a paragraph, then wrapped in a list:
+    
+    ```typescript
+    if ($from.parent.type === schema.nodes['heading']) {
+        tr = tr.setBlockType(from, to, schema.nodes['paragraph']);
+    }
+    ```
+  </Step>
+  
+  <Step title="Toggle Same List Type">
+    If already in the same list type, lift the item out of the list:
+    
+    ```typescript
+    if (node.type === listType) {
+        return liftListItem(schema.nodes['list_item'])(state, dispatch);
+    }
+    ```
+  </Step>
+  
+  <Step title="Convert Between Lists">
+    If in a different list type, convert it:
+    
+    ```typescript
+    dispatch(tr.setNodeMarkup(resolved.before(d), listType));
+    ```
+  </Step>
+  
+  <Step title="Wrap in New List">
+    If not in a list, wrap the selection:
+    
+    ```typescript
+    return wrapInList(listType)(state, dispatch);
+    ```
+  </Step>
+</Steps>
+
+## Schema Integration
+
+Lists are added to the schema using `addListNodes` from `prosemirror-schema-list`:
+
+```typescript
+import { addListNodes } from 'prosemirror-schema-list';
+
+const nodes = basicSchema.spec.nodes.update("paragraph", paragraph);
+
+export const EuclidesEditorSchema = new Schema({
+  nodes: addListNodes(nodes, "paragraph block*", "block"),
+  marks: basicSchema.spec.marks.addToEnd("strike", strike),
+});
+```
+
+**Source:** `~/workspace/source/projects/euclides-rich-editor/src/lib/engine/schema/euclides-schema.ts:47-52`
+
+### Understanding addListNodes
+
+The `addListNodes` function adds three node types to the schema:
+
+1. **`bullet_list`** - The unordered list container (`<ul>`)
+2. **`ordered_list`** - The ordered list container (`<ol>`)
+3. **`list_item`** - Individual list items (`<li>`)
+
+**Parameters:**
+
+```typescript
+addListNodes(
+  nodes,              // Existing nodes OrderedMap
+  "paragraph block*", // Content expression for list items
+  "block"            // Group name for list nodes
+)
+```
+
+- `"paragraph block*"` - List items can contain a paragraph followed by any number of blocks
+- `"block"` - Lists are block-level elements
+
+## List and Code Block Integration
+
+The `toggleCodeBlock` method has special handling for lists. When converting a list to a code block, it extracts all the text:
+
+```typescript
+if (
+    node.type === schema.nodes['bullet_list'] ||
+    node.type === schema.nodes['ordered_list']
+) {
+    // Extract text from all list items
+    let text = "";
+
+    node.forEach((listItem: any) => {
+        const para = listItem.firstChild;
+        if (para) {
+            text += para.textContent + "\n";
+        }
+    });
+
+    text = text.trimEnd();
+
+    const codeBlock = schema.nodes['code_block'].create(
+        null,
+        schema.text(text)
+    );
+
+    if (dispatch) {
+        dispatch(
+            tr.replaceWith(
+                $from.before(d),
+                $from.after(d),
+                codeBlock
+            )
+        );
+    }
+
+    return true;
+}
+```
+
+**Source:** `~/workspace/source/projects/euclides-rich-editor/src/lib/engine/commanmethods/command.methods.ts:15-50`
+
+This allows seamless conversion from:
+
+```
+• Item one
+• Item two
+• Item three
+```
+
+To:
+
+```
+Item one
+Item two
+Item three
+```
+
+## Document Structure
+
+Lists create a nested document structure:
+
+```json
+{
+  "type": "bullet_list",
+  "content": [
+    {
+      "type": "list_item",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            { "type": "text", "text": "First item" }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "list_item",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            { "type": "text", "text": "Second item" }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+<Tip>
+Each list item contains a paragraph by default, which allows for nested blocks like additional paragraphs or even nested lists within a single item.
+</Tip>
+
+## Best Practices
+
+<Steps>
+  <Step title="Use type-safe list types">
+    Import and use the `list` type for type safety:
+    
+    ```typescript
+    import { list } from 'euclides-rich-editor/core/types';
+    
+    toggleList(type: list) {
+      this.editorCommandsService.toggleList(type, this.view);
+    }
+    ```
+  </Step>
+  
+  <Step title="Handle toggle behavior">
+    Clicking the same list button twice will remove the list:
+    
+    ```typescript
+    // First click: wrap in bullet list
+    toggleList('bullet_list');
+    
+    // Second click on same button: unwrap list
+    toggleList('bullet_list');
+    ```
+  </Step>
+  
+  <Step title="Understand list conversion">
+    Switching between list types preserves items:
+    
+    ```typescript
+    // Start with bullet list
+    toggleList('bullet_list');
+    
+    // Convert to ordered list (keeps items)
+    toggleList('ordered_list');
+    ```
+  </Step>
+</Steps>
+
+## Advanced: Nested Lists
+
+To create nested lists, users can:
+
+1. Create a list item
+2. Press Tab to indent (requires custom input rules - not yet implemented)
+3. Or manually adjust structure through the ProseMirror API
+
+<Note>
+Nested list handling and Tab key support are planned features. Check the TODOs in the source code for implementation status.
+</Note>
+
+## Next Steps
+
+- Learn about [Text Formatting](/guides/text-formatting) to style list content
+- See [Custom Schema](/guides/custom-schema) to implement task lists
+- Explore [Links](/guides/links) to add hyperlinks within list items

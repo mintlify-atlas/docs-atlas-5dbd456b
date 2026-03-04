@@ -1,80 +1,445 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Get started with Euclides Rich Editor in minutes
 ---
 
-## Get started in three steps
+## Your First Editor
 
-Get your documentation site running locally and make your first customization.
+This guide will walk you through creating a functional rich text editor with all the core features in just a few minutes.
 
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
+<Steps>
+  <Step title="Create a new component">
+    Create a component that will host the editor:
     
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
+    ```bash
+    ng generate component editor-demo --standalone
+    ```
     
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
+    Or create a file manually:
     
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    ```typescript src/app/editor-demo/editor-demo.component.ts
+    import { Component } from '@angular/core';
+    import { EuclidesRichEditorComponent } from 'euclides-rich-editor';
+    
+    @Component({
+      selector: 'app-editor-demo',
+      standalone: true,
+      imports: [EuclidesRichEditorComponent],
+      templateUrl: './editor-demo.component.html',
+      styleUrls: ['./editor-demo.component.css']
+    })
+    export class EditorDemoComponent {}
+    ```
+  </Step>
+  
+  <Step title="Add the editor to your template">
+    The simplest way to use the editor is to add it directly to your template:
+    
+    ```html src/app/editor-demo/editor-demo.component.html
+    <div class="editor-container">
+      <h1>My Rich Text Editor</h1>
+      <euclides-rich-editor />
+    </div>
+    ```
+    
+    <Info>
+      The editor component includes a built-in toolbar with all formatting options.
+    </Info>
+  </Step>
+  
+  <Step title="Add basic styling">
+    Style the editor container for a better appearance:
+    
+    ```css src/app/editor-demo/editor-demo.component.css
+    .editor-container {
+      max-width: 900px;
+      margin: 2rem auto;
+      padding: 1rem;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    h1 {
+      margin-bottom: 1rem;
+      color: #333;
+    }
+    ```
+  </Step>
+  
+  <Step title="Try the editor">
+    Start your development server and test the editor:
+    
+    ```bash
+    ng serve
+    ```
+    
+    Navigate to your component and try these features:
+    
+    - **Bold**: Click the B button or press `Ctrl/Cmd + B`
+    - **Italic**: Click the I button or press `Ctrl/Cmd + I`
+    - **Lists**: Click the bullet or numbered list buttons
+    - **Links**: Select text and click the link button
+    - **Text Alignment**: Use the alignment buttons (left, center, right, justify)
+    - **Undo/Redo**: Use the arrow buttons or `Ctrl/Cmd + Z` and `Ctrl/Cmd + Shift + Z`
+  </Step>
+</Steps>
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+## Understanding the Editor Component
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+Let's explore what's happening inside the `EuclidesRichEditorComponent`:
 
-### Step 3: Go live
+### Component Structure
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+The editor consists of two main parts:
 
-## Next steps
+<CodeGroup>
+```typescript Component Class (src/lib/components/euclides-editor/euclides-rich-editor.component.ts)
+import { Component, ElementRef, ViewChild, AfterViewInit, OnDestroy } from '@angular/core';
+import { EditorView } from 'prosemirror-view';
+import { EditorEngine } from '../../engine/editor-engine';
+import { EditorCommandsService } from '../../core/editor-commands.service';
+import { EditorStateService } from '../../core/editor-state.service';
 
-Now that you have your docs running, explore these key features:
+@Component({
+  selector: 'euclides-rich-editor',
+  standalone: true,
+  templateUrl: './euclides-editor.component.html'
+})
+export class EuclidesRichEditorComponent implements AfterViewInit, OnDestroy {
+  @ViewChild('editor', { static: true })
+  editorRef!: ElementRef<HTMLDivElement>;
+  
+  view!: EditorView;
+  
+  ngAfterViewInit() {
+    // Initialize the ProseMirror view
+    this.view = EditorEngine.create(
+      this.editorRef.nativeElement,
+      this.editorStateService
+    );
+  }
+  
+  ngOnDestroy() {
+    this.view.destroy();
+  }
+}
+```
 
-<CardGroup cols={2}>
+```html Template (src/lib/components/euclides-editor/euclides-editor.component.html)
+<section class="contend-editor">
+  <!-- Formatting toolbar -->
+  <nav class="euclides-editor-nav">
+    <div class="buttons__container">
+      <button (click)="toggleBold()">Bold</button>
+      <button (click)="toggleItalic()">Italic</button>
+      <button (click)="toggleStrike()">Strike</button>
+      <!-- More buttons... -->
+    </div>
+  </nav>
+  
+  <!-- Editor content area -->
+  <div #editor class="euclides-editor-content"></div>
+</section>
+```
+</CodeGroup>
 
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
+### Key Features Explained
 
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
+<Tabs>
+  <Tab title="Text Formatting">
+    Text formatting is handled through the `EditorCommandsService`:
+    
+    ```typescript
+    toggleBold() {
+      if (this.editorCommandsService.toggleBold(this.view)) {
+        this.view.focus();
+      }
+    }
+    
+    toggleItalic() {
+      if (this.editorCommandsService.toggleItalic(this.view)) {
+        this.view.focus();
+      }
+    }
+    
+    toggleStrike() {
+      if (this.editorCommandsService.toggleStrike(this.view)) {
+        this.view.focus();
+      }
+    }
+    ```
+    
+    The service uses ProseMirror's `toggleMark` command:
+    
+    ```typescript src/lib/core/editor-commands.service.ts
+    toggleBold(view: EditorView): boolean {
+      const command = toggleMark(EuclidesEditorSchema.marks['strong']);
+      return command(view.state, view.dispatch);
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Lists">
+    Lists are created using specialized commands:
+    
+    ```typescript Component
+    toggleList(type: 'bullet_list' | 'ordered_list') {
+      if (this.editorCommandsService.toggleList(type, this.view)) {
+        this.view.focus();
+      }
+    }
+    ```
+    
+    ```html Template
+    <button (click)="toggleList('bullet_list')">Bullet List</button>
+    <button (click)="toggleList('ordered_list')">Numbered List</button>
+    ```
+    
+    The editor supports:
+    - Bullet lists (`<ul>`)
+    - Ordered lists (`<ol>`)
+    - Proper nesting
+    - Enter key to create new items
+    - Tab/Shift+Tab for indentation
+  </Tab>
+  
+  <Tab title="Text Alignment">
+    Text alignment modifies paragraph node attributes:
+    
+    ```typescript
+    toggleAlign(align: 'left' | 'center' | 'right' | 'justify') {
+      if (this.editorCommandsService.setTextAlign(align, this.view)) {
+        this.view.focus();
+      }
+    }
+    ```
+    
+    This works because the paragraph node includes a `textAlign` attribute:
+    
+    ```typescript src/lib/engine/schema/euclides-schema.ts
+    const paragraph: NodeSpec = {
+      attrs: {
+        textAlign: { default: 'left' }
+      },
+      parseDOM: [{
+        tag: "p",
+        getAttrs: (dom: HTMLElement) => ({
+          textAlign: dom.style.textAlign || "left"
+        })
+      }],
+      toDOM(node: Node) {
+        return [
+          "p",
+          { style: `text-align:${node.attrs['textAlign']}` },
+          0
+        ];
+      }
+    };
+    ```
+  </Tab>
+  
+  <Tab title="Links">
+    Link management includes insertion, editing, and removal:
+    
+    ```typescript
+    applyLink(url: string) {
+      const { state, dispatch } = this.view;
+      const href = url.startsWith('http') ? url : 'https://' + url;
+      
+      const linkInfo = getLinkRange(state);
+      
+      if (linkInfo) {
+        // Update existing link
+        const { start, end } = linkInfo;
+        dispatch(
+          state.tr
+            .removeMark(start, end, state.schema.marks['link'])
+            .addMark(
+              start,
+              end,
+              state.schema.marks['link'].create({ href })
+            )
+        );
+      } else {
+        // Insert new link
+        const from = state.selection.from;
+        const tr = state.tr.insertText(href, from);
+        tr.addMark(
+          from,
+          from + href.length,
+          state.schema.marks['link'].create({ href })
+        );
+        dispatch(tr);
+      }
+      
+      this.view.focus();
+    }
+    ```
+    
+    The editor includes a link popover component for a better UX.
+  </Tab>
+  
+  <Tab title="History">
+    Undo/redo functionality is built-in using ProseMirror's history plugin:
+    
+    ```typescript
+    import { undo, redo } from 'prosemirror-history';
+    
+    undo() {
+      if (undo(this.view.state, this.view.dispatch)) {
+        this.view.focus();
+      }
+    }
+    
+    redo() {
+      if (redo(this.view.state, this.view.dispatch)) {
+        this.view.focus();
+      }
+    }
+    ```
+    
+    The `EditorStateService` tracks whether undo/redo is available:
+    
+    ```html
+    <button [disabled]="!editorStateService.canUndo()" (click)="undo()">
+      Undo
+    </button>
+    <button [disabled]="!editorStateService.canRedo()" (click)="redo()">
+      Redo
+    </button>
+    ```
+  </Tab>
+</Tabs>
 
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
+## Advanced Example
 
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
+Here's a more complete example showing how to integrate the editor into a form:
 
-</CardGroup>
+```typescript src/app/document-editor/document-editor.component.ts
+import { Component } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { EuclidesRichEditorComponent } from 'euclides-rich-editor';
+
+@Component({
+  selector: 'app-document-editor',
+  standalone: true,
+  imports: [EuclidesRichEditorComponent, FormsModule],
+  template: `
+    <div class="document-form">
+      <div class="form-group">
+        <label for="title">Document Title</label>
+        <input 
+          id="title" 
+          type="text" 
+          [(ngModel)]="title"
+          placeholder="Enter document title"
+        />
+      </div>
+      
+      <div class="form-group">
+        <label>Content</label>
+        <euclides-rich-editor />
+      </div>
+      
+      <div class="form-actions">
+        <button (click)="save()">Save Document</button>
+        <button (click)="cancel()">Cancel</button>
+      </div>
+    </div>
+  `,
+  styles: [`
+    .document-form {
+      max-width: 1000px;
+      margin: 2rem auto;
+      padding: 2rem;
+    }
+    
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+      color: #333;
+    }
+    
+    input[type="text"] {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 1rem;
+    }
+    
+    .form-actions {
+      display: flex;
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+    
+    button {
+      padding: 0.75rem 1.5rem;
+      border: none;
+      border-radius: 4px;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    
+    button:first-child {
+      background: #007bff;
+      color: white;
+    }
+    
+    button:last-child {
+      background: #6c757d;
+      color: white;
+    }
+  `]
+})
+export class DocumentEditorComponent {
+  title: string = '';
+  
+  save() {
+    console.log('Saving document:', this.title);
+    // Implement save logic
+  }
+  
+  cancel() {
+    console.log('Cancelling edit');
+    // Implement cancel logic
+  }
+}
+```
+
+## Keyboard Shortcuts
+
+The editor supports standard keyboard shortcuts:
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl/Cmd + B` | Toggle bold |
+| `Ctrl/Cmd + I` | Toggle italic |
+| `Ctrl/Cmd + Z` | Undo |
+| `Ctrl/Cmd + Shift + Z` | Redo |
+| `Ctrl/Cmd + Y` | Redo (alternative) |
+| `Enter` | Create new paragraph or list item |
+| `Shift + Enter` | Hard line break |
+| `Tab` (in list) | Increase indentation |
+| `Shift + Tab` (in list) | Decrease indentation |
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  The keyboard shortcuts are defined in `src/lib/engine/keymaps/euclides-keymaps.ts` and can be customized if needed.
 </Note>
+
+## What's Next?
+
+Now that you have a working editor, explore these topics:
+
+- **Customization** - Learn how to customize the editor's appearance and behavior
+- **Schema Extension** - Add custom nodes and marks to the editor
+- **Content Management** - Extract and load editor content
+- **Plugins** - Extend functionality with custom plugins
+- **API Reference** - Explore all available methods and properties

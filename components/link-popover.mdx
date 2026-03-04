@@ -1,0 +1,315 @@
+---
+title: 'Link Popover Component'
+description: 'UI component for creating and managing hyperlinks in the editor'
+---
+
+The `LinkPopoverComponent` provides a user interface for creating, editing, and removing hyperlinks within the Euclides Rich Editor.
+
+## Overview
+
+This standalone Angular component displays a popover UI with an input field and action buttons for link management. It uses Angular signals for reactive state management.
+
+**Component Selector:** `app-link-popover`
+
+## Usage
+
+The link popover is integrated into the main editor component and appears when users interact with the link button or existing links.
+
+```html
+<app-link-popover 
+  [visible]="showLinkPopover" 
+  [initialUrl]="currentLink" 
+  (confirm)="applyLink($event)"
+  (cancel)="closePopover()" 
+  (remove)="removeLink()">
+</app-link-popover>
+```
+
+## Inputs
+
+### visible
+
+**Type:** `boolean`
+
+**Default:** `false`
+
+Controls the visibility of the popover. When `true`, the popover is displayed.
+
+```typescript
+showLinkPopover = true; // Show the popover
+```
+
+### initialUrl
+
+**Type:** `string`
+
+**Default:** `''`
+
+Sets the initial value in the URL input field. This is typically used when editing an existing link.
+
+```typescript
+currentLink = 'https://example.com'; // Pre-populate with existing link
+```
+
+## Outputs
+
+### confirm
+
+**Type:** `EventEmitter<string>`
+
+Emitted when the user confirms the link by clicking the confirm button. Returns the entered URL.
+
+```typescript
+applyLink(url: string) {
+  console.log('Link applied:', url);
+  // Apply link logic here
+}
+```
+
+### cancel
+
+**Type:** `EventEmitter<void>`
+
+Emitted when the user clicks the cancel button to close the popover without applying changes.
+
+```typescript
+closePopover() {
+  this.showLinkPopover = false;
+}
+```
+
+### remove
+
+**Type:** `EventEmitter<void>`
+
+Emitted when the user clicks the remove button to delete an existing link.
+
+```typescript
+removeLink() {
+  // Remove link mark from selection
+  this.showLinkPopover = false;
+}
+```
+
+## Internal State
+
+### url Signal
+
+The component uses an Angular signal to manage the URL input state:
+
+```typescript
+url = signal<string>('');
+```
+
+This signal is synchronized with the `initialUrl` input using an `effect()` hook:
+
+```typescript
+constructor() {
+  effect(() => {
+    this.url.set(this.initialUrl());
+  });
+}
+```
+
+**Location:** link-popover.component.ts:23
+
+## Component Methods
+
+### onConfirm()
+
+Validates and emits the URL when the user clicks the confirm button.
+
+```typescript
+onConfirm() {
+  if (!this.url()) return; // Validation: URL must not be empty
+  this.confirm.emit(this.url());
+}
+```
+
+**Location:** link-popover.component.ts:28
+
+<Note>
+The method prevents empty URLs from being confirmed, ensuring valid link creation.
+</Note>
+
+## Template Structure
+
+The popover template conditionally renders based on the `visible` input:
+
+```html
+@if (visible()) {
+  <div class="popover">
+    <input 
+      type="text" 
+      [value]="url()" 
+      #inputElement 
+      (input)="url.set(inputElement.value)"
+      placeholder="Paste a link..." 
+    />
+    
+    <div class="actions">
+      <!-- Confirm button -->
+      <button (click)="onConfirm()">
+        <!-- Checkmark icon -->
+      </button>
+      
+      <!-- Cancel button -->
+      <button (click)="cancel.emit()">
+        <!-- X icon -->
+      </button>
+      
+      <!-- Remove button -->
+      <button (click)="remove.emit()">
+        <!-- Trash icon -->
+      </button>
+    </div>
+  </div>
+}
+```
+
+## Action Buttons
+
+The popover provides three action buttons:
+
+<CardGroup cols={3}>
+
+<Card title="Confirm" icon="check">
+  Applies the entered URL to the selected text or creates a new link
+</Card>
+
+<Card title="Cancel" icon="xmark">
+  Closes the popover without making changes
+</Card>
+
+<Card title="Remove" icon="trash">
+  Removes the link mark from the current selection
+</Card>
+
+</CardGroup>
+
+## Integration with Editor
+
+The link popover is used within the main editor component through the following workflow:
+
+### 1. Opening the Popover
+
+```typescript
+openLinkPopover() {
+  const { state } = this.view;
+  
+  // Check if cursor is within an existing link
+  const linkInfo = getLinkRange(state);
+  this.currentLink = linkInfo?.link.attrs['href'] ?? '';
+  
+  // Show the popover
+  this.showLinkPopover = true;
+}
+```
+
+### 2. Applying the Link
+
+```typescript
+applyLink(url: string) {
+  const { state, dispatch } = this.view;
+  
+  // Normalize URL (add https:// if missing)
+  const href = url.startsWith('http') ? url : 'https://' + url;
+  
+  const linkInfo = getLinkRange(state);
+  
+  if (linkInfo) {
+    // Update existing link
+    const { start, end, link } = linkInfo;
+    dispatch(
+      state.tr
+        .removeMark(start, end, state.schema.marks['link'])
+        .addMark(start, end, state.schema.marks['link'].create({
+          href,
+          title: link.attrs['title']
+        }))
+    );
+  } else {
+    // Create new link
+    const from = state.selection.from;
+    const tr = state.tr.insertText(href, from);
+    tr.addMark(
+      from,
+      from + href.length,
+      state.schema.marks['link'].create({ href, title: href })
+    );
+    dispatch(tr);
+  }
+  
+  this.view.focus();
+  this.closePopover();
+}
+```
+
+**Location:** euclides-rich-editor.component.ts:97
+
+### 3. Removing the Link
+
+```typescript
+removeLink() {
+  const { state, dispatch } = this.view;
+  const linkInfo = getLinkRange(state);
+  
+  if (!linkInfo) return;
+  
+  dispatch(
+    state.tr.removeMark(
+      linkInfo.start,
+      linkInfo.end,
+      state.schema.marks['link']
+    )
+  );
+  
+  this.closePopover();
+}
+```
+
+**Location:** euclides-rich-editor.component.ts:138
+
+## URL Normalization
+
+<Info>
+The editor automatically adds the `https://` protocol to URLs that don't already have a protocol specified. This ensures all links are valid and clickable.
+</Info>
+
+```typescript
+const href = url.startsWith('http') ? url : 'https://' + url;
+```
+
+## State Management Pattern
+
+The component demonstrates modern Angular patterns:
+
+- **Signals** for reactive state management
+- **Input signals** for component inputs
+- **Output emitters** for event communication
+- **Effects** for side effects and synchronization
+
+```typescript
+visible = input<boolean>(false);      // Input signal
+initialUrl = input<string>('');       // Input signal
+url = signal<string>('');             // Internal signal
+confirm = output<string>();           // Output emitter
+```
+
+## Standalone Component
+
+This component is defined as standalone, making it independently importable:
+
+```typescript
+@Component({
+  selector: 'app-link-popover',
+  standalone: true,
+  templateUrl: './link-popover.component.html',
+})
+export class LinkPopoverComponent { ... }
+```
+
+## See Also
+
+- [Euclides Editor Component](/components/editor) - Main editor component
+- [Links Guide](/guides/links) - Guide to working with links in the editor

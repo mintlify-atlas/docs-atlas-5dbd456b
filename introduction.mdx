@@ -1,0 +1,134 @@
+---
+title: Introduction
+description: A powerful ProseMirror-based rich text editor for Angular applications
+---
+
+## What is Euclides Rich Editor?
+
+Euclides Rich Editor is a modern, standalone Angular component library that provides a fully-featured rich text editing experience. Built on top of [ProseMirror](https://prosemirror.net/), it offers a robust and extensible architecture for building document editing interfaces in Angular applications.
+
+<Info>
+  Euclides Rich Editor is designed as a standalone Angular component, making it easy to integrate into any Angular 21+ application without additional module configuration.
+</Info>
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="ProseMirror Foundation" icon="code">
+    Built on ProseMirror's battle-tested document model, providing a solid foundation for complex editing scenarios.
+  </Card>
+  
+  <Card title="Standalone Component" icon="puzzle-piece">
+    Modern Angular standalone architecture eliminates the need for NgModule imports.
+  </Card>
+  
+  <Card title="Rich Text Formatting" icon="bold">
+    Support for bold, italic, strikethrough, and code blocks with intuitive keyboard shortcuts.
+  </Card>
+  
+  <Card title="List Support" icon="list">
+    Both ordered and unordered lists with proper nesting and keyboard navigation.
+  </Card>
+  
+  <Card title="Text Alignment" icon="align-left">
+    Full control over text alignment: left, center, right, and justify.
+  </Card>
+  
+  <Card title="Link Management" icon="link">
+    Interactive link insertion and editing with a built-in popover interface.
+  </Card>
+  
+  <Card title="History Management" icon="clock-rotate-left">
+    Built-in undo/redo functionality with proper state tracking.
+  </Card>
+  
+  <Card title="Extensible Schema" icon="layer-group">
+    Custom ProseMirror schema allows for extending nodes and marks to fit your needs.
+  </Card>
+</CardGroup>
+
+## Architecture Overview
+
+Euclides Rich Editor follows ProseMirror's architectural principles, organizing functionality into distinct layers:
+
+### Core Components
+
+<Steps>
+  <Step title="EditorState">
+    Manages the complete state of the editor including the document structure, current selection, and active plugins. This immutable state model ensures predictable behavior and easy debugging.
+  </Step>
+  
+  <Step title="EditorView">
+    Renders the editor state to the DOM and handles user interactions. The view is automatically kept in sync with the state.
+  </Step>
+  
+  <Step title="Schema">
+    Defines the document structure by specifying available nodes (paragraphs, headings, lists) and marks (bold, italic, links). The schema acts as the "grammar" of your documents.
+    
+    See `src/lib/engine/schema/euclides-schema.ts`
+  </Step>
+  
+  <Step title="Commands">
+    Encapsulate editing operations like toggling bold, inserting lists, or changing text alignment. Commands are composable and can be bound to keyboard shortcuts.
+    
+    See `src/lib/core/editor-commands.service.ts`
+  </Step>
+</Steps>
+
+### Document Model
+
+ProseMirror uses a hierarchical document model with two main concepts:
+
+<Tabs>
+  <Tab title="Nodes">
+    **Nodes** represent block-level elements or document structure:
+    
+    - `paragraph` - Standard text blocks with text alignment support
+    - `heading` - Six levels of headings (h1-h6)
+    - `code_block` - Preformatted code blocks
+    - `bullet_list` / `ordered_list` - List containers
+    - `list_item` - Individual list items
+    - `blockquote` - Quotation blocks
+    
+    Nodes can have attributes. For example, the `paragraph` node includes a `textAlign` attribute:
+    
+    ```typescript
+    const paragraph: NodeSpec = {
+      attrs: {
+        textAlign: { default: 'left' }
+      }
+    };
+    ```
+  </Tab>
+  
+  <Tab title="Marks">
+    **Marks** represent inline formatting applied to text:
+    
+    - `strong` - Bold text
+    - `em` - Italic text
+    - `strike` - Strikethrough (custom addition)
+    - `link` - Hyperlinks with href and title attributes
+    - `code` - Inline code formatting
+    
+    Marks can be toggled on and off and can overlap. For example, text can be both bold and italic simultaneously.
+  </Tab>
+</Tabs>
+
+## Use Cases
+
+Euclides Rich Editor is ideal for a variety of applications:
+
+- **Content Management Systems** - Provide editors with a familiar rich text editing experience
+- **Documentation Platforms** - Enable users to create formatted documentation with code blocks and lists
+- **Messaging Applications** - Add rich text formatting to chat or messaging interfaces
+- **Note-Taking Apps** - Build Notion-like note editors with structured content
+- **Form Builders** - Allow users to create rich text content within forms
+- **Blog Platforms** - Give authors powerful formatting tools for their posts
+
+<Note>
+  The editor's schema is fully extensible, allowing you to add custom nodes and marks for specialized use cases like mentions, custom blocks, or domain-specific formatting.
+</Note>
+
+## What's Next?
+
+Ready to get started? Follow our [installation guide](/installation) to add Euclides Rich Editor to your project, or jump straight to the [quickstart](/quickstart) for a complete working example.

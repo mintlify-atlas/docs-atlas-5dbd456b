@@ -1,0 +1,210 @@
+---
+title: Installation
+description: Install Euclides Rich Editor in your Angular project
+---
+
+## Prerequisites
+
+Before installing Euclides Rich Editor, ensure your project meets these requirements:
+
+<AccordionGroup>
+  <Accordion title="Angular Version">
+    Euclides Rich Editor requires **Angular 21.0.0 or higher**.
+    
+    The editor is built as a standalone component and requires:
+    - `@angular/core` ^21.1.0
+    - `@angular/common` ^21.1.0
+    
+    Check your Angular version:
+    
+    ```bash
+    ng version
+    ```
+  </Accordion>
+  
+  <Accordion title="TypeScript">
+    TypeScript **5.9.2 or higher** is recommended for the best development experience.
+  </Accordion>
+  
+  <Accordion title="Node.js">
+    Node.js 18.x or higher is required for Angular 21.
+  </Accordion>
+</AccordionGroup>
+
+## Installation Steps
+
+<Steps>
+  <Step title="Install the package">
+    Install Euclides Rich Editor using your preferred package manager:
+    
+    <CodeGroup>
+    ```bash npm
+    npm install euclides-rich-editor
+    ```
+    
+    ```bash yarn
+    yarn add euclides-rich-editor
+    ```
+    
+    ```bash pnpm
+    pnpm add euclides-rich-editor
+    ```
+    </CodeGroup>
+    
+    <Note>
+      The package includes all necessary ProseMirror dependencies and types.
+    </Note>
+  </Step>
+  
+  <Step title="Verify peer dependencies">
+    Euclides Rich Editor has the following peer dependencies:
+    
+    ```json package.json
+    {
+      "peerDependencies": {
+        "@angular/common": "^21.1.0",
+        "@angular/core": "^21.1.0"
+      }
+    }
+    ```
+    
+    These should already be installed in your Angular project. If not, install them:
+    
+    <CodeGroup>
+    ```bash npm
+    npm install @angular/common@^21.1.0 @angular/core@^21.1.0
+    ```
+    
+    ```bash yarn
+    yarn add @angular/common@^21.1.0 @angular/core@^21.1.0
+    ```
+    
+    ```bash pnpm
+    pnpm add @angular/common@^21.1.0 @angular/core@^21.1.0
+    ```
+    </CodeGroup>
+  </Step>
+  
+  <Step title="Import the component">
+    Since Euclides Rich Editor is a standalone component, you can import it directly in your component:
+    
+    ```typescript app.component.ts
+    import { Component } from '@angular/core';
+    import { EuclidesRichEditorComponent } from 'euclides-rich-editor';
+    
+    @Component({
+      selector: 'app-root',
+      standalone: true,
+      imports: [EuclidesRichEditorComponent],
+      template: `
+        <euclides-rich-editor />
+      `
+    })
+    export class AppComponent {}
+    ```
+    
+    <Info>
+      No need to add the component to an `NgModule` - it works out of the box with Angular's standalone API.
+    </Info>
+  </Step>
+  
+  <Step title="Add styles (optional)">
+    The editor includes default styles. To customize the appearance, you can:
+    
+    1. Import the default styles in your `styles.css` or `styles.scss`:
+    
+    ```css styles.css
+    /* Import default editor styles if provided */
+    @import 'euclides-rich-editor/styles';
+    ```
+    
+    2. Or add custom styles targeting the editor classes:
+    
+    ```css styles.css
+    .euclides-editor-nav {
+      /* Toolbar styles */
+    }
+    
+    .euclides-editor-content {
+      /* Editor content area styles */
+    }
+    ```
+  </Step>
+  
+  <Step title="Verify installation">
+    Start your development server:
+    
+    ```bash
+    ng serve
+    ```
+    
+    You should see the editor rendered with a toolbar containing formatting buttons and an editable content area.
+    
+    <Check>
+      If the editor appears and you can type into it, the installation was successful!
+    </Check>
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Module not found errors">
+    If you see errors like `Cannot find module 'euclides-rich-editor'`:
+    
+    1. Ensure the package is installed: `npm list euclides-rich-editor`
+    2. Clear your node_modules and reinstall:
+       ```bash
+       rm -rf node_modules package-lock.json
+       npm install
+       ```
+    3. Restart your development server
+  </Accordion>
+  
+  <Accordion title="Peer dependency warnings">
+    If you see warnings about peer dependencies:
+    
+    ```
+    npm WARN euclides-rich-editor@0.0.1 requires a peer of @angular/core@^21.1.0
+    ```
+    
+    Update your Angular version to 21.1.0 or higher:
+    ```bash
+    ng update @angular/core @angular/cli
+    ```
+  </Accordion>
+  
+  <Accordion title="TypeScript errors">
+    If you encounter TypeScript compilation errors:
+    
+    1. Ensure your `tsconfig.json` has proper settings:
+       ```json tsconfig.json
+       {
+         "compilerOptions": {
+           "target": "ES2022",
+           "module": "ES2022",
+           "lib": ["ES2022", "dom"],
+           "moduleResolution": "bundler"
+         }
+       }
+       ```
+    
+    2. Update TypeScript to version 5.9.2 or higher:
+       ```bash
+       npm install typescript@~5.9.2 --save-dev
+       ```
+  </Accordion>
+  
+  <Accordion title="Editor not rendering">
+    If the editor component doesn't appear:
+    
+    1. Check browser console for errors
+    2. Verify the component is imported in your standalone component or module
+    3. Ensure you're using the correct selector: `<euclides-rich-editor>`
+    4. Check that Angular is properly bootstrapped in your `main.ts`
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+Now that you have Euclides Rich Editor installed, continue to the [quickstart guide](/quickstart) to learn how to use it in your application.

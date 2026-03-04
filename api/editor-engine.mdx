@@ -1,0 +1,72 @@
+---
+title: EditorEngine
+description: Core engine class that creates and initializes the Euclides Rich Editor
+---
+
+## Overview
+
+The `EditorEngine` class is the core engine that creates and initializes the Euclides Rich Editor. It provides a static factory method to create a fully configured ProseMirror `EditorView` instance with the appropriate schema, plugins, and state management.
+
+## EditorEngine.create()
+
+Creates and returns a ready-to-use editor instance.
+
+### Signature
+
+```typescript
+static create(element: HTMLElement, stateService: EditorStateService): EditorView
+```
+
+### Parameters
+
+- `element` (HTMLElement): The DOM element where the editor will be mounted
+- `stateService` (EditorStateService): Angular service for managing editor state synchronization
+
+### Returns
+
+- `EditorView`: A fully initialized ProseMirror editor view
+
+### How it Works
+
+The `create()` method performs the following steps:
+
+1. **Creates Editor State**: Initializes a ProseMirror `EditorState` containing:
+   - The current document
+   - Cursor position
+   - Selection state
+   - History (undo/redo)
+   - Internal ProseMirror metadata
+
+2. **Applies Schema**: Uses `EuclidesEditorSchema` to establish document structure rules
+
+3. **Registers Plugins**: Builds and applies plugins via `buildPlugins()` that provide:
+   - Keyboard shortcuts
+   - History management
+   - Custom editor logic
+   - Synchronization with Angular's `EditorStateService`
+
+4. **Creates Editor View**: Returns a `EditorView` mounted to the provided element with the CSS class `euclides-editor`
+
+### Example Usage
+
+```typescript
+import { EditorEngine } from './engine/editor-engine';
+import { EditorStateService } from './core/editor-state.service';
+
+const element = document.getElementById('editor-container');
+const stateService = new EditorStateService();
+
+const view = EditorEngine.create(element, stateService);
+```
+
+## Integration with EditorStateService
+
+The `EditorStateService` is passed to the plugin system through `buildPlugins(stateService)`. This enables:
+
+- Real-time synchronization between ProseMirror's state and Angular's reactive signals
+- Tracking of undo/redo availability for UI buttons
+- Communication between the editor and Angular components
+
+## Source Reference
+
+Location: `~/workspace/source/projects/euclides-rich-editor/src/lib/engine/editor-engine.ts`

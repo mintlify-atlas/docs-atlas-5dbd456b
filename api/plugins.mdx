@@ -1,0 +1,155 @@
+---
+title: Plugins
+description: Plugin system for extending the Euclides Rich Editor functionality
+---
+
+## Overview
+
+Plugins extend the behavior of the Euclides Rich Editor by adding functionality such as keyboard shortcuts, history management, custom input rules, and synchronization with Angular's state management.
+
+## buildPlugins()
+
+The `buildPlugins()` function creates and returns an array of ProseMirror plugins in a specific order.
+
+### Signature
+
+```typescript
+export function buildPlugins(stateService: EditorStateService)
+```
+
+### Parameters
+
+- `stateService` (EditorStateService): Angular service for state synchronization
+
+### Returns
+
+An array of ProseMirror plugins configured for the editor.
+
+### Plugin Order
+
+```typescript
+export function buildPlugins(stateService: EditorStateService) {
+  return [
+    buildEuclidesKeymap(EuclidesEditorSchema), // 👈 PRIMERO
+    keymap(baseKeymap),                        // 👈 DESPUÉS
+    history(),
+    buildHistoryStatePlugin(stateService),
+  ];
+}
+```
+
+**Plugin order matters**: Custom keymaps are loaded first so they take precedence over base keymaps.
+
+## Available Plugins
+
+### 1. Euclides Keymap
+
+Custom keyboard shortcuts specific to Euclides Editor.
+
+```typescript
+buildEuclidesKeymap(EuclidesEditorSchema)
+```
+
+Provides shortcuts for:
+- Bold, italic, undo/redo
+- List item splitting
+- Code blocks
+- Line breaks
+
+See the [Keymaps](/api/keymaps) documentation for details.
+
+### 2. Base Keymap
+
+ProseMirror's standard keyboard shortcuts.
+
+```typescript
+keymap(baseKeymap)
+```
+
+Provides:
+- Basic text editing (backspace, delete, etc.)
+- Cursor movement
+- Selection commands
+- Platform-specific defaults
+
+### 3. History Plugin
+
+Enables undo/redo functionality.
+
+```typescript
+history()
+```
+
+**Features:**
+- Tracks document changes
+- Maintains undo/redo stack
+- Integrates with keyboard shortcuts (Ctrl+Z, Ctrl+Y)
+
+### 4. History State Plugin
+
+Synchronizes undo/redo availability with Angular's `EditorStateService`.
+
+```typescript
+buildHistoryStatePlugin(stateService)
+```
+
+## History State Plugin
+
+The History State Plugin bridges ProseMirror's history system with Angular's reactive signals.
+
+### Implementation
+
+```typescript
+export function buildHistoryStatePlugin(stateService: EditorStateService): Plugin {
+  return new Plugin({
+    view(view) {
+      const updateState = () => {
+        stateService.canUndo.set(undoDepth(view.state) > 0);
+        stateService.canRedo.set(redoDepth(view.state) > 0);
+      };
+
+      updateState();
+      
+      return {
+        update() {
+          updateState();
+        }
+      };
+    }
+  });
+}
+```
+
+### How it Works
+
+1. **Initialization**: The `view()` function executes once when the plugin connects to the editor
+
+2. **State Updates**: The `updateState()` function:
+   - Calls `undoDepth(view.state)` to check available undo steps
+   - Calls `redoDepth(view.state)` to check available redo steps
+   - Updates Angular signals `canUndo` and `canRedo` accordingly
+
+3. **Reactivity**: The `update()` method executes on every editor change, keeping the UI in sync
+
+### Use Case
+
+This plugin enables/disables undo and redo buttons in the Angular UI based on editor state:
+
+- If `undoDepth > 0`, the undo button becomes enabled
+- If `redoDepth > 0`, the redo button becomes enabled
+
+## Plugin Capabilities
+
+Plugins can:
+
+- **Add keyboard shortcuts** (keymap)
+- **Track history** for undo/redo (history)
+- **Define input rules** for automatic transformations
+- **React to editor changes** through view updates
+- **Modify editor state** based on user actions
+- **Synchronize with external state** (e.g., Angular services)
+
+## Source References
+
+- Plugin builder: `~/workspace/source/projects/euclides-rich-editor/src/lib/engine/plugins/euclides-plugins.ts`
+- History state plugin: `~/workspace/source/projects/euclides-rich-editor/src/lib/engine/plugins/history-buttons.plugin.ts`

@@ -1,0 +1,271 @@
+---
+title: Schema
+description: Understanding how schemas define document structure in Euclides Rich Editor
+---
+
+The **Schema** is the "dictionary" and "grammar" of your editor. It defines what types of content are allowed and how they behave.
+
+## What is a Schema?
+
+In ProseMirror (and therefore Euclides), the schema defines:
+
+1. **What nodes exist** - Block-level structures like paragraphs, headings, lists
+2. **What marks exist** - Inline formatting like bold, italic, links
+3. **How they parse from HTML** - Converting pasted HTML into the document
+4. **How they serialize to HTML** - Converting the document back to HTML
+5. **What attributes they support** - Custom properties like text alignment
+
+<Note>
+The schema acts as a contract. Content that doesn't match the schema cannot exist in the document. This prevents invalid document states.
+</Note>
+
+## EuclidesEditorSchema Definition
+
+Euclides extends ProseMirror's basic schema to add custom features. Here's the complete schema (euclides-schema.ts:49):
+
+```typescript
+import { NodeSpec, Schema } from 'prosemirror-model';
+import { schema as basicSchema } from 'prosemirror-schema-basic';
+import { addListNodes } from 'prosemirror-schema-list';
+
+export const EuclidesEditorSchema = new Schema({
+  nodes: addListNodes(nodes, "paragraph block*", "block"),
+  marks: basicSchema.spec.marks.addToEnd("strike", strike),
+});
+```
+
+This schema:
+
+1. Starts with `prosemirror-schema-basic` as the foundation
+2. Adds list support with `addListNodes`
+3. Extends the paragraph node with custom attributes
+4. Adds the `strike` mark for strikethrough text
+
+## Built-in Nodes
+
+Euclides inherits these nodes from `prosemirror-schema-basic`:
+
+| Node | HTML | Description |
+|------|------|-------------|
+| `doc` | - | Root document node |
+| `paragraph` | `<p>` | Text paragraph (extended with textAlign) |
+| `heading` | `<h1>`–`<h6>` | Headings level 1-6 |
+| `blockquote` | `<blockquote>` | Block quotation |
+| `horizontal_rule` | `<hr>` | Horizontal divider |
+| `code_block` | `<pre><code>` | Code block |
+| `text` | - | Plain text node |
+| `hard_break` | `<br>` | Line break |
+| `image` | `<img>` | Image |
+
+Plus list nodes from `prosemirror-schema-list`:
+
+| Node | HTML | Description |
+|------|------|-------------|
+| `bullet_list` | `<ul>` | Unordered list |
+| `ordered_list` | `<ol>` | Ordered list |
+| `list_item` | `<li>` | List item |
+
+## Built-in Marks
+
+Euclides includes these marks:
+
+| Mark | HTML | Description |
+|------|------|-------------|
+| `strong` | `<strong>` | Bold text |
+| `em` | `<em>` | Italic text |
+| `link` | `<a>` | Hyperlink |
+| `code` | `<code>` | Inline code |
+| `strike` | `<s>` | Strikethrough (custom addition) |
+
+## Custom Node: Paragraph with Text Alignment
+
+Euclides extends the basic paragraph node to support text alignment (euclides-schema.ts:10):
+
+```typescript
+const paragraph: NodeSpec = {
+  // Start with original paragraph configuration
+  ...schema.spec.nodes.get('paragraph'),
+  
+  // Add custom attribute
+  attrs: {
+    textAlign: { default: 'left' }
+  },
+  
+  // Convert HTML → ProseMirror document
+  parseDOM: [
+    {
+      tag: "p",
+      getAttrs: (dom: HTMLElement) => ({
+        textAlign: dom.style.textAlign || "left"
+      })
+    }
+  ],
+  
+  // Convert ProseMirror document → HTML
+  toDOM(node: Node) {
+    return [
+      "p",
+      { style: `text-align:${node.attrs['textAlign']}` },
+      0  // Content goes here
+    ];
+  }
+};
+```
+
+<Info>
+The `0` in `toDOM` indicates where the node's content should be placed. It's a ProseMirror convention for "content hole".
+</Info>
+
+### How It Works
+
+1. **attrs** - Defines the `textAlign` attribute with default value 'left'
+2. **parseDOM** - When pasting HTML, extracts `text-align` from the style attribute
+3. **toDOM** - When rendering, applies the alignment as an inline style
+
+This allows commands to update alignment:
+
+```typescript
+// In EditorCommandsService
+setTextAlign(align: string, view: EditorView) {
+  const { state, dispatch } = view;
+  const nodeType = state.schema.nodes['paragraph'];
+  
+  return setBlockType(nodeType, { textAlign: align })(
+    state, 
+    dispatch
+  );
+}
+```
+
+## Custom Mark: Strike (Strikethrough)
+
+Euclides adds strikethrough as a custom mark (euclides-schema.ts:37):
+
+```typescript
+const strike: MarkSpec = {
+  parseDOM: [
+    { tag: "s" },
+    { tag: "del" },
+    { style: "text-decoration=line-through" }
+  ],
+  toDOM() {
+    return ["s", 0];
+  }
+};
+```
+
+This mark:
+
+- Recognizes `<s>`, `<del>`, or `text-decoration: line-through` when parsing
+- Outputs as `<s>` tag when serializing
+- Can be toggled with `toggleMark` command
+
+<Tip>
+Marks can overlap (e.g., **bold** and *italic* together), but nodes cannot. This is why formatting is typically marks, not nodes.
+</Tip>
+
+## Adding List Support
+
+Lists require special handling because they have hierarchical structure. Euclides uses the `prosemirror-schema-list` package:
+
+```typescript
+const nodes = basicSchema.spec.nodes.update("paragraph", paragraph);
+
+export const EuclidesEditorSchema = new Schema({
+  nodes: addListNodes(nodes, "paragraph block*", "block"),
+  marks: basicSchema.spec.marks.addToEnd("strike", strike),
+});
+```
+
+The `addListNodes` function:
+
+- Takes the existing nodes
+- Adds `bullet_list`, `ordered_list`, and `list_item` nodes
+- Configures them to contain `paragraph` and other blocks
+- Returns the extended node collection
+
+## Schema Rules and Validation
+
+The schema enforces document structure at all times:
+
+<Accordion title="Content Expressions">
+  Each node defines what content it can contain using expressions like:
+  - `"inline*"` - Zero or more inline elements
+  - `"block+"` - One or more block elements
+  - `"paragraph block*"` - A paragraph followed by any blocks
+</Accordion>
+
+<Accordion title="Groups">
+  Nodes belong to groups like "block" or "inline", allowing rules like "accepts any block node"
+</Accordion>
+
+<Accordion title="Marks">
+  Each node specifies which marks can be applied to its content. By default, inline content accepts all marks.
+</Accordion>
+
+<Accordion title="Attributes">
+  Attributes must have default values or be explicitly set when creating nodes. No undefined attributes allowed.
+</Accordion>
+
+## Reading the Schema at Runtime
+
+You can inspect the schema in your code:
+
+```typescript
+import { EuclidesEditorSchema } from './schema/euclides-schema';
+
+// Access nodes
+const paragraphType = EuclidesEditorSchema.nodes.paragraph;
+const headingType = EuclidesEditorSchema.nodes.heading;
+
+// Access marks
+const boldMark = EuclidesEditorSchema.marks.strong;
+const strikeMark = EuclidesEditorSchema.marks.strike;
+
+// Check what's available
+console.log(Object.keys(EuclidesEditorSchema.nodes));
+// ["doc", "paragraph", "heading", "blockquote", ...]
+
+console.log(Object.keys(EuclidesEditorSchema.marks));
+// ["strong", "em", "link", "code", "strike"]
+```
+
+<Note>
+The component code uses this pattern to access node and mark types when executing commands (euclides-rich-editor.component.ts:67):
+
+```typescript
+toggleList(type: list) {
+  console.log(EuclidesEditorSchema.nodes);
+  if (this.editorCommandsService.toggleList(type, this.view))
+    this.view.focus();
+}
+```
+</Note>
+
+## Why Schema Matters
+
+<CardGroup cols={2}>
+  <Card title="Type Safety" icon="shield">
+    The schema prevents invalid document states at runtime
+  </Card>
+  <Card title="Parsing Control" icon="file-import">
+    Define exactly how pasted HTML becomes your document
+  </Card>
+  <Card title="Serialization" icon="file-export">
+    Control how your document converts to HTML
+  </Card>
+  <Card title="Command Safety" icon="wand-magic-sparkles">
+    Commands work with schema to ensure valid transforms
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Nodes vs Marks" icon="shapes" href="/concepts/nodes-vs-marks">
+    Learn when to use nodes vs marks
+  </Card>
+  <Card title="Editor State" icon="database" href="/concepts/editor-state">
+    See how schema integrates with state
+  </Card>
+</CardGroup>

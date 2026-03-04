@@ -1,0 +1,267 @@
+---
+title: 'Euclides Editor Component'
+description: 'Core rich text editor component with ProseMirror integration'
+---
+
+The `EuclidesRichEditorComponent` is the main editor component that provides a full-featured rich text editing experience powered by ProseMirror.
+
+## Overview
+
+This component is a standalone Angular component that implements a rich text editor with formatting capabilities, list management, text alignment, and undo/redo functionality.
+
+**Component Selector:** `euclides-rich-editor`
+
+## Basic Usage
+
+```typescript
+import { Component } from '@angular/core';
+import { EuclidesRichEditorComponent } from 'euclides-rich-editor';
+
+@Component({
+  selector: 'app-root',
+  standalone: true,
+  imports: [EuclidesRichEditorComponent],
+  template: `
+    <euclides-rich-editor />
+  `
+})
+export class AppComponent {}
+```
+
+## Component Architecture
+
+The editor component implements two Angular lifecycle hooks:
+
+- **`AfterViewInit`** - Initializes the ProseMirror editor view after Angular renders the component
+- **`OnDestroy`** - Cleans up the editor view when the component is destroyed
+
+### Dependencies
+
+The component injects two core services:
+
+- **`EditorCommandsService`** - Handles all formatting and editing commands
+- **`EditorStateService`** - Manages undo/redo state and history
+
+## Public Methods
+
+The component exposes the following methods for programmatic control:
+
+### Text Formatting
+
+<CodeGroup>
+
+```typescript toggleBold()
+this.editorRef.toggleBold();
+// Toggles bold formatting for selected text
+```
+
+```typescript toggleItalic()
+this.editorRef.toggleItalic();
+// Toggles italic formatting for selected text
+```
+
+```typescript toggleStrike()
+this.editorRef.toggleStrike();
+// Toggles strikethrough formatting for selected text
+```
+
+</CodeGroup>
+
+### Text Alignment
+
+```typescript
+toggleAlign(align: string)
+```
+
+Sets text alignment for the current selection. Supported alignment values:
+
+- `'left'` - Align text to the left
+- `'center'` - Center align text
+- `'right'` - Align text to the right
+- `'justify'` - Justify text
+
+**Example:**
+
+```typescript
+this.editorRef.toggleAlign('center');
+```
+
+### Lists
+
+```typescript
+toggleList(type: list)
+```
+
+Toggles list formatting for the current selection.
+
+**Supported list types:**
+
+- `'bullet_list'` - Unordered list with bullets
+- `'ordered_list'` - Numbered list
+- `'task_list'` - Task list with checkboxes
+
+**Example:**
+
+```typescript
+this.editorRef.toggleList('bullet_list');
+```
+
+### Code Blocks
+
+```typescript
+toggleCodeBlock()
+```
+
+Toggles code block formatting for the current selection.
+
+```typescript
+this.editorRef.toggleCodeBlock();
+```
+
+### History Management
+
+<CodeGroup>
+
+```typescript undo()
+this.editorRef.undo();
+// Undoes the last edit action
+```
+
+```typescript redo()
+this.editorRef.redo();
+// Redoes the previously undone action
+```
+
+</CodeGroup>
+
+### Link Management
+
+```typescript
+openLinkPopover()
+```
+
+Opens the link popover UI for creating or editing links. If the cursor is within an existing link, the popover will pre-populate with the current URL.
+
+```typescript
+applyLink(url: string)
+```
+
+Applies or updates a link in the editor. This method:
+
+- Automatically adds `https://` protocol if missing
+- Updates existing links when called on linked text
+- Creates new links for selected text or inserts clickable URL
+
+```typescript
+removeLink()
+```
+
+Removes the link mark from the current selection.
+
+## Component Template Structure
+
+The editor component consists of two main sections:
+
+### 1. Navigation Toolbar
+
+Provides formatting buttons for:
+
+- Text formatting (bold, italic, strikethrough)
+- Text alignment (left, center, right, justify)
+- Lists (bullet, ordered)
+- Code blocks
+- Links
+- Undo/redo
+
+### 2. Editor Area
+
+The editable content area where users type and format text:
+
+```html
+<div #editor id="editor" class="editor euclides-editor-content" role="input"></div>
+```
+
+<Note>
+The editor view is created in `ngAfterViewInit` to ensure the DOM element is available before ProseMirror initialization.
+</Note>
+
+## Usage with Template Reference
+
+You can access component methods using template references:
+
+```typescript
+import { Component, ViewChild } from '@angular/core';
+import { EuclidesRichEditorComponent } from 'euclides-rich-editor';
+
+@Component({
+  selector: 'app-document',
+  standalone: true,
+  imports: [EuclidesRichEditorComponent],
+  template: `
+    <euclides-rich-editor #editor />
+    
+    <div class="custom-toolbar">
+      <button (click)="editor.toggleBold()">Bold</button>
+      <button (click)="editor.toggleItalic()">Italic</button>
+      <button (click)="editor.undo()">Undo</button>
+    </div>
+  `
+})
+export class DocumentComponent {
+  @ViewChild('editor') editor!: EuclidesRichEditorComponent;
+  
+  ngAfterViewInit() {
+    // Access editor methods programmatically
+    // this.editor.toggleBold();
+  }
+}
+```
+
+## Internal Implementation Details
+
+### ProseMirror Integration
+
+The component creates a ProseMirror `EditorView` instance using the `EditorEngine.create()` method:
+
+```typescript
+ngAfterViewInit() {
+  this.view = EditorEngine.create(
+    this.editorRef.nativeElement,
+    this.editorStateService
+  );
+}
+```
+
+**Location:** euclides-rich-editor.component.ts:38
+
+### Focus Management
+
+All formatting methods automatically return focus to the editor after executing commands, ensuring smooth editing experience.
+
+### Link Detection
+
+The editor uses the `getLinkRange()` utility to detect if the current cursor position is within a link mark, enabling context-aware link editing.
+
+**Location:** euclides-rich-editor.component.ts:88
+
+## Cleanup
+
+The component properly destroys the ProseMirror view when the component is destroyed:
+
+```typescript
+ngOnDestroy(): void {
+  this.view.destroy();
+}
+```
+
+**Location:** euclides-rich-editor.component.ts:155
+
+<Warning>
+Always ensure the component is properly destroyed to prevent memory leaks. Angular handles this automatically when using the component in templates.
+</Warning>
+
+## See Also
+
+- [Link Popover Component](/components/link-popover) - UI for managing links
+- [Editor Schema](/api/schema) - ProseMirror schema definition
+- [Editor Commands Service](/api/editor-commands-service) - Available editor commands

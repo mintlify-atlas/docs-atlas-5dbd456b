@@ -1,0 +1,136 @@
+---
+title: Schema
+description: Document schema definition for the Euclides Rich Editor
+---
+
+## Overview
+
+The `EuclidesEditorSchema` defines the structure, rules, and capabilities of documents in the Euclides Rich Editor. It specifies what nodes (block elements) and marks (inline formatting) are available, along with their attributes and HTML serialization rules.
+
+## EuclidesEditorSchema
+
+The schema is built by extending ProseMirror's `basicSchema` with custom nodes and marks.
+
+```typescript
+export const EuclidesEditorSchema = new Schema({
+  nodes: addListNodes(nodes, "paragraph block*", "block"),
+  marks: basicSchema.spec.marks.addToEnd("strike", strike),
+});
+```
+
+## Nodes
+
+### Paragraph Node
+
+The paragraph node is extended from `basicSchema` with a custom `textAlign` attribute.
+
+```typescript
+const paragraph: NodeSpec = {
+  ...schema.spec.nodes.get('paragraph'),
+  attrs: {
+    textAlign: { default: 'left' }
+  },
+  parseDOM: [
+    {
+      tag: "p",
+      getAttrs: (dom: HTMLElement) => ({
+        textAlign: dom.style.textAlign || "left"
+      })
+    }
+  ],
+  toDOM(node: Node) {
+    return [
+      "p",
+      { style: `text-align:${node.attrs['textAlign']}` },
+      0
+    ]
+  }
+}
+```
+
+**Features:**
+- `textAlign` attribute with default value of `'left'`
+- Parses `text-align` CSS property from HTML `<p>` tags
+- Serializes to HTML with inline `text-align` style
+
+### List Nodes
+
+List support is added using ProseMirror's `addListNodes()` utility:
+
+```typescript
+addListNodes(nodes, "paragraph block*", "block")
+```
+
+This adds:
+- `ordered_list`: Numbered lists
+- `bullet_list`: Unordered lists
+- `list_item`: Individual list items
+
+**Parameters:**
+- `"paragraph block*"`: Specifies that list items can contain a paragraph followed by any number of block nodes
+- `"block"`: Categorizes list nodes as block-level elements
+
+### Other Nodes
+
+Inherited from `basicSchema`:
+- `heading`: Heading levels 1-6
+- `code_block`: Code blocks
+- `blockquote`: Block quotes
+- `horizontal_rule`: Horizontal rules
+- `hard_break`: Line breaks
+- `text`: Text content
+
+## Marks
+
+### Built-in Marks
+
+From `basicSchema`:
+- `strong`: Bold text (Ctrl+B)
+- `em`: Italic text (Ctrl+I)
+- `link`: Hyperlinks with href attribute
+- `code`: Inline code
+
+### Strike Mark
+
+Custom mark for strikethrough text:
+
+```typescript
+const strike: MarkSpec = {
+  parseDOM: [
+    { tag: "s" },
+    { tag: "del" },
+    { style: "text-decoration=line-through" }
+  ],
+  toDOM() {
+    return ["s", 0];
+  }
+};
+```
+
+**Features:**
+- Parses `<s>`, `<del>` tags, and `text-decoration: line-through` CSS
+- Serializes to `<s>` tag
+- Added to schema with: `basicSchema.spec.marks.addToEnd("strike", strike)`
+
+## Schema Construction
+
+The schema is built in three steps:
+
+1. **Update paragraph node**: Replace the default paragraph with the custom version
+   ```typescript
+   const nodes = basicSchema.spec.nodes.update("paragraph", paragraph);
+   ```
+
+2. **Add list nodes**: Integrate ordered and unordered lists
+   ```typescript
+   nodes: addListNodes(nodes, "paragraph block*", "block")
+   ```
+
+3. **Add strike mark**: Append the strikethrough mark
+   ```typescript
+   marks: basicSchema.spec.marks.addToEnd("strike", strike)
+   ```
+
+## Source Reference
+
+Location: `~/workspace/source/projects/euclides-rich-editor/src/lib/engine/schema/euclides-schema.ts`
